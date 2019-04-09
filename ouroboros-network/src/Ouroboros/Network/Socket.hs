@@ -134,6 +134,8 @@ connectTo
      , Ord ptcl
      , Enum ptcl
      , Bounded ptcl
+     , Show ptcl
+     , Mx.MiniProtocolLimits ptcl
      )
   => MuxApplication ClientApp ptcl IO
   -- ^ application to run over the connection
@@ -190,6 +192,8 @@ beginConnection
        , Ord ptcl
        , Enum ptcl
        , Bounded ptcl
+       , Show ptcl
+       , Mx.MiniProtocolLimits ptcl
        )
     => (addr -> st -> STM.STM (AcceptConnection st ptcl IO))
     -- ^ either accept or reject a connection.
@@ -249,6 +253,8 @@ runNetworkNode'
        , Ord ptcl
        , Enum ptcl
        , Bounded ptcl
+       , Show ptcl
+       , Mx.MiniProtocolLimits ptcl
        )
     => Socket.Socket
     -> (SomeException -> IO ())
@@ -275,6 +281,8 @@ withServerNode
        , Ord ptcl
        , Enum ptcl
        , Bounded ptcl
+       , Show ptcl
+       , Mx.MiniProtocolLimits ptcl
        )
     => Socket.AddrInfo
     -> (Socket.SockAddr -> AnyMuxServerApp ptcl IO)
@@ -319,6 +327,8 @@ withSimpleServerNode
        , Ord ptcl
        , Enum ptcl
        , Bounded ptcl
+       , Show ptcl
+       , Mx.MiniProtocolLimits ptcl
        )
     => Socket.AddrInfo
     -> MuxApplication ServerApp ptcl IO

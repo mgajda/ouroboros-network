@@ -84,7 +84,8 @@ pipeAsMuxBearer pcRead pcWrite = do
       sduSize = return 32768
 
 runNetworkNodeWithPipe
-    :: (Mx.ProtocolEnum ptcl, Ord ptcl, Enum ptcl, Bounded ptcl)
+    :: ( Mx.ProtocolEnum ptcl, Ord ptcl, Enum ptcl, Bounded ptcl, Show ptcl
+       , Mx.MiniProtocolLimits ptcl)
     => Mx.MuxApplication appType ptcl IO
     -> Handle -- ^ read handle
     -> Handle -- ^ write handle
