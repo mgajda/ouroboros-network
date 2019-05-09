@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE TypeFamilies          #-}
@@ -105,27 +106,23 @@ decodeMuxSDUHeader buf =
 
 -- | demux runs as a single separate thread and reads complete 'MuxSDU's from the underlying
 -- Mux Bearer and forwards it to the matching ingress queue.
-demux :: (MonadSTM m, MonadSay m, MonadThrow m, Ord ptcl, Enum ptcl, Show ptcl
+demux :: (MonadSTM m, MonadSay m, MonadThrow (STM m), Ord ptcl, Enum ptcl, Show ptcl
          , MiniProtocolLimits ptcl, HasCallStack)
       => PerMuxSharedState ptcl m -> m ()
 demux pmss = forever $ do
     (sdu, _) <- Ouroboros.Network.Mux.Types.read $ bearer pmss
     -- say $ printf "demuxing sdu on mid %s mode %s lenght %d " (show $ msId sdu) (show $ msMode sdu)
     --             (BL.length $ msBlob sdu)
-    r_e <- atomically $ do
+    atomically $ do
         -- Notice the mode reversal, ModeResponder is delivered to ModeInitiator and vice versa.
         let q = ingressQueue (dispatchTable pmss) (msId sdu) (negMiniProtocolMode $ msMode sdu)
         buf <- readTVar q
         if BL.length buf + BL.length (msBlob sdu) <= maximumIngressQueue (msId sdu)
-            then do
-                writeTVar q $ BL.append buf (msBlob sdu)
-                return $ Right ()
-            else return $ Left $ MuxError MuxIngressQueueOverRun
-                             (printf "Ingress Queue overrun on %s %s" (show $ msId sdu) (show $ msMode sdu))
-                             callStack
-    case r_e of
-         Right _ -> return ()
-         Left  e -> throwM e
+            then writeTVar q $ BL.append buf (msBlob sdu)
+            else throwM $ MuxError MuxIngressQueueOverRun
+                              (printf "Ingress Queue overrun on %s %s"
+                               (show $ msId sdu) (show $ msMode sdu))
+                              callStack
 
 -- | Return the ingress queueu for a given 'MiniProtocolId' and 'MiniProtocolMode'.
 ingressQueue :: (MonadSTM m, Ord ptcl, Enum ptcl)
