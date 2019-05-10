@@ -69,3 +69,4 @@ https://github.com/input-output-hk/cardano-base 5bca69f048c4d599c362d797ee8b036c
 https://github.com/input-output-hk/iohk-monitoring-framework 8614c66d9f13ad7bd68975700651a720a78d620e iohk-monitoring 1bz7kfbjqwf3kc80qqinwfqqmrmkmj5mf1cx9alvdmjdx65didiv iohk-monitoring iohk-monitoring.nix
 https://github.com/input-output-hk/iohk-monitoring-framework 8614c66d9f13ad7bd68975700651a720a78d620e contra-tracer 1bz7kfbjqwf3kc80qqinwfqqmrmkmj5mf1cx9alvdmjdx65didiv contra-tracer contra-tracer.nix
 https://github.com/input-output-hk/cardano-base 577162e98ba2fbe42c1b6042a9a0a15bbc4956d0 binary 02wzcic9q2zrp7x6vz5dwipp3q08r572ysp2k0n59d4za5w911qh cardano-binary cardano-binary.nix
+https://github.com/input-output-hk/cardano-shell acf5b26fbf3c3a3927507e093d54e70ad521787b . 1b5dl1xvbkn3cdxi4rbzd1gjdsv2a2qcpjl6zmpswqpz30cr9mzr cardano-shell cardano-shell.nix
