@@ -34,6 +34,9 @@ extra-deps:
   - git: https://github.com/input-output-hk/cardano-shell
     commit: acf5b26fbf3c3a3927507e093d54e70ad521787b
 
+  - git: https://github.com/input-output-hk/cardano-sl-x509
+    commit: e8bfc1294e088f90e5ae0b4aedbc82ee46ac5ee4
+
   - ekg-0.4.0.15
   - libyaml-0.1.0.0
   - time-units-1.0.0
