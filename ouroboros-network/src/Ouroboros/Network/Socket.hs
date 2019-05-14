@@ -1,7 +1,9 @@
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 
 -- |
 -- Module exports interface for running a node over a socket over TCP \/ IP.
@@ -29,6 +31,9 @@ import qualified Network.Socket as Socket hiding (recv)
 import qualified Network.Socket.ByteString.Lazy as Socket (recv, sendAll)
 
 import           Ouroboros.Network.Time
+import           Network.TypedProtocol.Core
+import           Network.TypedProtocol.Driver
+import           Control.Tracer (Tracer (..), nullTracer)
 
 import qualified Ouroboros.Network.Server.Socket as Server
 import qualified Ouroboros.Network.Mux as Mx
@@ -42,6 +47,16 @@ import           Ouroboros.Network.Mux.Interface ( Connection (..)
                                                  )
 
 import           Text.Printf
+
+#define OUROBOROS_NETWORK_SOCKET_DEBUG
+
+socketSendRecvTracer :: (MonadSay m, (forall st st'. Show (Message ps st st')))
+                     => Tracer m (TraceSendRecv ps)
+#ifdef OUROBOROS_NETWORK_SOCKET_DEBUG
+socketSendRecvTracer = Tracer (say . show)
+#else
+socketSendRecvTracer = nullTracer
+#endif
 
 -- |
 -- Create @'MuxBearer'@ from a socket.

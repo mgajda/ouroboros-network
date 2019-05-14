@@ -1,4 +1,6 @@
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -32,7 +34,9 @@ import           Control.Monad.Class.MonadAsync
 import           Control.Monad.Class.MonadSTM
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTime
-import           Control.Tracer (nullTracer)
+import           Control.Monad.Class.MonadSay
+import           Control.Tracer (Tracer (..), nullTracer)
+import           Network.TypedProtocol.Codec
 import           Network.TypedProtocol.Driver
 import           Network.TypedProtocol.ReqResp.Client
 import           Network.TypedProtocol.ReqResp.Server
@@ -255,12 +259,12 @@ setupMiniReqRsp serverAction mpsEndVar request response = do
     clientPeer = reqRespClientPeer (plainClient [request])
 
     clientInit clientResultVar clientChan = do
-        result <- runPeer nullTracer codecReqResp clientChan clientPeer
+        result <- runPeer socketSendRecvTracer codecReqResp clientChan clientPeer
         atomically (putTMVar clientResultVar result)
         end
 
     serverRsp serverResultVar serverChan = do
-        result <- runPeer nullTracer codecReqResp serverChan serverPeer
+        result <- runPeer socketSendRecvTracer codecReqResp serverChan serverPeer
         atomically (putTMVar serverResultVar result)
         end
 
