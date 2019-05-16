@@ -1466,27 +1466,26 @@ Transition table:
 \newcommand{\Tx}{\state{Tx}}
 
 \subsection{Description}
-A core node uses the transaction submission protocol to retrieve transactions from
-a wallet.
-The node runs the client instance of the transaction submission protocol and the wallet runs
-the server instance.
+A core node uses the transaction submission protocol to retrieve transactions from a wallet.
+The node runs the server instance of the transaction submission protocol and the wallet runs
+the client instance.
 Note, that the protocol is {\bf not} used to forward transactions from one core node to an other.
-
+Also note, that in the transaction submission mini protocol the initial agency is at the server.
 \subsection{State machine}
 
 \begin{tabular}{|l|l|}
   \hline
   \multicolumn{2}{|c|}{Agency} \\ \hline
-  Client has Agency & \Idle \\  \hline
-  Server has Agency & \SendHashes, \SendTx \\ \hline
+  Client has Agency & \SendHashes, \SendTx \\ \hline
+  Server has Agency & \Idle \\  \hline
 \end{tabular}
 
 \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=4cm, semithick]
   \tikzstyle{every state}=[fill=red,draw=none,text=white]
-  \node[state, green, initial]                                   (Idle)       {\Idle};
-  \node[state, right of=Idle]                                    (Done)       {\Done};
-  \node[state, blue, above of=Idle]                              (SendTx)     {\SendTx};
-  \node[state, blue, below of=Idle]                              (SendHashes) {\SendHashes};
+  \node[state, blue, initial]                                     (Idle)       {\Idle};
+  \node[state, right of=Idle]                                     (Done)       {\Done};
+  \node[state, green, above of=Idle]                              (SendTx)     {\SendTx};
+  \node[state, green, below of=Idle]                              (SendHashes) {\SendHashes};
 
   \draw (Idle)         edge[]      node{\MsgDone}           (Done);
   \draw (Idle)         edge[right, bend right=45]      node{\GetTx}               (SendTx);
@@ -1499,18 +1498,18 @@ Note, that the protocol is {\bf not} used to forward transactions from one core 
 Messages of the protocol:
 \begin{description}
 \item [\GetHashes{} {\boldmath $n$}]
-      The client asks for transaction hashes from the server.
+      The server asks for transaction hashes from the client.
       $n$ is the maximum number of hashes it will accept.
 \item [\SendHashes{} {\boldmath $hashes$}]
-      The server replies with a list of $hashes$.
+      The client replies with a list of $hashes$.
 \item [\GetTx{} {\boldmath $hash$}]
-      The client requests the transaction with $hash$.
-      The client must only send \GetTx~messages with hashes it has received
+      The server requests the transaction with $hash$.
+      The server must only send \GetTx~messages with hashes it has received
       in a \SendHashes~message from the this server.
 \item [\Tx{} {\boldmath $tx$}]
-      The server sends transaction $tx$ to the client.
+      The client sends transaction $tx$ to the server.
 \item [\MsgDone]
-      The client terminates the mini protocol.
+      The server terminates the mini protocol.
 \end{description}
 
 \begin{tabular}{|l|l|l|l|} \hline
@@ -1527,18 +1526,18 @@ Messages of the protocol:
 The transaction submission protocol is strictly only used
 by a (core) node to retrieve transactions from a wallet (or a similar source of transactions).
 It is {\bf not} used to relay transactions from node to node.
-It is important to note that core nodes only ever run client instances of the protocol,
-while the server instance is implemented by the wallet.
-Therefore only the client instance of the protocol has to be safe a against an adversarial server
+It is important to note that core nodes only ever run server instances of the protocol,
+while the client instance is implemented by the wallet.
+Therefore only the server instance of the protocol has to be safe a against an adversarial client
 and not the other way around.
 
-A client can use the \GetHashes~$n$ message to request a limited number transaction hashes from the server
+A server can use the \GetHashes~$n$ message to request a limited number transaction hashes from the client
 and, after that, downloads the transactions one after the other.
-When a new transaction arrives (within a \Tx~message), the client uses the consensus layer to
+When a new transaction arrives (within a \Tx~message), the server uses the consensus layer to
 validate the transaction.
-If the transaction is valid, the node puts it in the mempool and otherwise it is discarded.
+If the transaction is valid, the server puts it in the mempool and otherwise it is discarded.
 Depending on the rate of incoming transactions and on the frequency of invalid transactions,
-a client can implement a suitable policy to throttle down a server or to disconnect altogether.
+a server can implement a suitable policy to throttle down a client or to disconnect altogether.
 
 \section{Pipelining of Mini Protocols}
 \label{pipelining}
