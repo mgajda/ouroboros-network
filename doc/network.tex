@@ -1487,11 +1487,11 @@ Also note, that in the transaction submission mini protocol the initial agency i
   \node[state, green, above of=Idle]                              (SendTx)     {\SendTx};
   \node[state, green, below of=Idle]                              (SendHashes) {\SendHashes};
 
-  \draw (Idle)         edge[]      node{\MsgDone}           (Done);
+  \draw (Idle)         edge[]                          node{\MsgDone}           (Done);
   \draw (Idle)         edge[right, bend right=45]      node{\GetTx}               (SendTx);
   \draw (Idle)         edge[left, bend right=45]       node{\GetHashes}           (SendHashes);
-  \draw (SendTx)       edge[left, bend right=45]      node{\Tx}            (Idle);
-  \draw (SendHashes)   edge[right, bend right=45]       node{\SendHashes}    (Idle);
+  \draw (SendTx)       edge[left, bend right=45]       node{\Tx}            (Idle);
+  \draw (SendHashes)   edge[right, bend right=45]      node{\SendHashes}    (Idle);
 
 \end{tikzpicture}
 
@@ -1538,6 +1538,58 @@ validate the transaction.
 If the transaction is valid, the server puts it in the mempool and otherwise it is discarded.
 Depending on the rate of incoming transactions and on the frequency of invalid transactions,
 a server can implement a suitable policy to throttle down a client or to disconnect altogether.
+
+
+\section{Handshake Mini Protocol}
+\hsref{src/Ouroboros/Network/Protocol/Handshake/Type.hs}
+\label{handshake-protocol}
+\newcommand{\Propose}{\state{Propose}}
+\newcommand{\Confirm}{\state{Confirm}}
+\newcommand{\ProposeVersions}{\msg{ProposeVersions}}
+\newcommand{\AcceptVersion}{\msg{AcceptVersion}}
+\newcommand{\Refuse}{\msg{Refuse}}
+
+\subsection{Description}
+\subsection{State machine}
+
+\begin{tabular}{|l|l|}
+  \hline
+  \multicolumn{2}{|c|}{Agency} \\ \hline
+  Client has Agency & \Propose \\ \hline
+  Server has Agency & \Confirm \\  \hline
+\end{tabular}
+
+\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=5cm, semithick]
+  \tikzstyle{every state}=[fill=red,draw=none,text=white]
+  \node[state, green, initial]                                     (Propose)       {\Propose};
+  \node[state, blue, right of=Propose]                             (Confirm)     {\Confirm};
+  \node[state, right of=Confirm]                                   (Done)       {\Done};
+
+  \draw (Propose)      edge[]      node{\ProposeVersions}          (Confirm);
+  \draw (Confirm)      edge[above, bend left]       node{\AcceptVersion}     (Done);
+  \draw (Confirm)      edge[below, bend right]      node{\Refuse}            (Done);
+
+\end{tikzpicture}
+
+Messages of the protocol:
+\begin{description}
+\item [\ProposeVersions{} {\boldmath $versions$}]
+      The client proposes a number of possible version.
+\item [\AcceptVersion{} {\boldmath $(version,parameters)$}]
+      The server accepts a particular combination of $version$ and $parameters$.
+\item [\Refuse{} $reason$]
+      The server refuses the proposed versions.
+\end{description}
+
+\begin{tabular}{|l|l|l|l|} \hline
+\multicolumn{4}{|c|}{Transition table} \\ \hline
+  from        & message/event      & parameters            & to          \\ \hline\hline
+  \Propose    & \ProposeVersions   & $versions$            & \Confirm    \\ \hline
+  \Confirm    & \AcceptVersion     & $(version,parameter)$ & \Done \\ \hline
+  \Confirm    & \Refuse            & $reason$              & \Done \\ \hline
+\end{tabular}
+
+\subsection{Client and Server Implementation}
 
 \section{Pipelining of Mini Protocols}
 \label{pipelining}
