@@ -65,8 +65,8 @@
 % add reference to the relevant Haskell source (as comment)
 %\newcommand{\hsref}[1]{}  should be hidden in the final document
 \newcommand{\hsref}[1]{\href{https://github.com/input-output-hk/ouroboros-network/blob/master/#1}{\emph{Haskell source: #1}}}
-%\newcommand{\wip}[1]{\color{magenta}{#1}\color{black}}
-\newcommand{\wip}[1]{}
+\newcommand{\wip}[1]{\color{magenta}{#1}\color{black}}
+%\newcommand{\wip}[1]{}
 \newcommand{\hide}[1]{}
 \newcommand{\trans}[1]{\texttt{#1}}
 \newcommand{\state}[1]{\texttt{#1}}
@@ -1550,6 +1550,12 @@ a server can implement a suitable policy to throttle down a client or to disconn
 \newcommand{\Refuse}{\msg{Refuse}}
 
 \subsection{Description}
+The handshake mini protocol is used to negotiate the versions of the mini
+protocols that are used by the client and the server.
+It is run exactly when a new connection is initialized.
+Section \ref{peer-setup-section} explains the live cycle of a connection and the role of
+the handshake mini protocol in more detail.
+
 \subsection{State machine}
 
 \begin{tabular}{|l|l|}
@@ -1590,6 +1596,19 @@ Messages of the protocol:
 \end{tabular}
 
 \subsection{Client and Server Implementation}
+In a run of handshake mini protocol the peers exchange only two messages:
+The client requests to connect with a \ProposeVersions{} message that contains a map of all supported
+protocol versions
+and the server replies either with a \AcceptVersion{} message containing the negotiated version
+or a \Refuse{} message.
+Section~\ref{included-cddl} contains the CDDL-specification of the binary format of the messages.
+
+The handshake mini protocol runs before the MUS/DEMUX itself is initialized.
+\wip{
+see in the code if this is still true:
+Each message is transmitted within a single MUX segment, i.e. with a proper segment header,
+but, as the MUX/DEMUX is not yet running the messages must not be split into multiple segments.
+}
 
 \section{Pipelining of Mini Protocols}
 \label{pipelining}
@@ -1756,7 +1775,8 @@ This section describes the protocol and sketches a possible implementation.
 Roughly the implementation performs the following tasks:
 \begin{itemize}
 \item Open a socket/ acquire resources from the OS.
-\item Verify protocol Versions.
+\item Negotiate the protocol version with the handshake mini protocol
+      (Section \ref{handshake-mini-protocol}.
 \item Spawn the threads that run the mini protocols.
 \item Measure transmission times and amount of in-flight data.
 \item Catch exceptions that are thrown by the mini protocols.
@@ -1787,8 +1807,6 @@ Roughly the implementation performs the following tasks:
          (Dead);
 \end{tikzpicture}
 
-
-
 A connection passes through several stages during its life cycle.
 \begin{description}
 \item[\Larval]    The connection exists but nothing has been initialised yet.
@@ -1801,23 +1819,6 @@ A connection passes through several stages during its life cycle.
 \newcommand{\InitReq}{\msg{InitReq}}
 \newcommand{\InitRsp}{\msg{InitRsp}}
 \newcommand{\InitFail}{\msg{InitFail}}
-
-\subsection{Setup of a Connection with the Mux-Control Protocol}
-The Mux-Control protocol is used to negotiate the versions of the mini
-protocols that are used by the client and the server.
-It is run exactly once after the connection enters the \Connected-state and before
-any of the mini protocols is initialised.
-
-In a run of the version negotiation within the Mux-Control protocol
-the peers exchange only two messages:
-The client requests to connect with a \InitReq~message that contains a map of all supported
-protocol versions
-and the server replies either with a \InitRsp~message containing the negotiated version
-or a \InitFail~message.
-
-Section~\ref{included-cddl} contains the CDDL-specification of the binary format of the messages.
-Each message is transmitted within single MUX segment, i.e. with a proper segment header,
-but, as the MUX/DEMUX is not yet running the messages must not be split into multiple segments.
 
 \noindent\hsref{ouroboros-network/src/Ouroboros/Network/Mux/Types.hs}
 \newline\hsref{ouroboros-network/src/Ouroboros/Network/NodeToNode.hs}
