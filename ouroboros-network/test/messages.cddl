@@ -2,12 +2,13 @@
 ; ! allMessages is NOT a valid wire format !
 
 allMessages =
-      [0,chainSyncMessage]
-    / [1,reqRespMessage]
-    / [2,pingPongMessage]
-    / [3,blockFetchMessage]
-    / [4,txSubmissionMessage]
-    / [5,muxControlMessage]
+       [0, chainSyncMessage]
+     / [1, reqRespMessage]
+     / [2, pingPongMessage]
+     / [3, blockFetchMessage]
+     / [4, txSubmissionMessage]
+     / [5, handshakeMessage]
+       [5, handshakeMessage]
 
 ; Chain Sync Protocol
 ; reference implementation of the codec in
@@ -23,7 +24,8 @@ chainSyncMessage
     / msgIntersectUnchanged
     / chainSyncMsgDone
 
-; these records use fixed length list encodings TODO: lookup CDDL syntax for that
+; These records use fixed length list encodings.
+; TODO: lookup CDDL syntax for that
 msgRequestNext         = [0]
 msgAwaitReply          = [1]
 msgRollForward         = [2, header, point]
@@ -102,21 +104,51 @@ txSubmissionMessage
     / msgTx
     / txSubmissionMsgDone
 
-msgGetHashes  = [0,int]
-msgSendHashes = [1,[txHash]]
-msgGetTx      = [2,txHash]
-msgTx         = [3,transaction]
+msgGetHashes  = [0, int]
+msgSendHashes = [1, [txHash]]
+msgGetTx      = [2, txHash]
+msgTx         = [3, transaction]
 txSubmissionMsgDone = [4]
 
 txHash        = bytes .cbor any
 transaction   = bytes .cbor any
 
-; MuxControl Protocol
+; Handshake Protocol
 ; reference implementation of the codec in
-; ouroboros-network/src/Ouroboros/Network/Mux/Control.hs
+; ouroboros-network/src/Ouroboros/Network/Protocol/Handshake/Codec.hs
 
-muxControlMessage = msgInitReq / msgInitRsp / msgInitFail
+versionNumber = uint .size 4
+handshakeMessage =
+       msgProposeVersions
+;    / msgAcceptVersion
+     / msgRefuse
 
-msgInitReq  = [0] ; ToDo
-msgInitRsp  = [1]
-msgInitFail = [2]
+msgProposeVersions = [0 , proposeVersions]
+
+; CDDL is not expressive enough to describe the all possible values of proposeVersions.
+; proposeVersions is a tables that maps version numbers to version parameters.
+; The codec requires that the key are unique and in ascending order.
+; This specification only enumerates version numbers from 1..7.
+
+params = any
+proposeVersions =
+    { ? 1 => params
+    , ? 2 => params
+    , ? 3 => params
+    , ? 4 => params
+    , ? 5 => params
+    , ? 6 => params
+    , ? 7 => params
+    }
+
+msgAcceptVersion   = [1]
+msgRefuse          = [2, refuseReason ]
+
+refuseReason
+    = refuseReasonVersionMismatch
+    / refuseReasonHandshakeDecodeError
+    / refuseReasonRefused
+
+refuseReasonVersionMismatch      = [0 , [ versionNumber] ]
+refuseReasonHandshakeDecodeError = [1 , versionNumber, tstr]
+refuseReasonRefused              = [2 , versionNumber, tstr]

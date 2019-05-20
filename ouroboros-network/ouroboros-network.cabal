@@ -253,6 +253,9 @@ test-suite cddl
                        Ouroboros.Network.Protocol.ChainSync.Type
                        Ouroboros.Network.Protocol.PingPong.Codec
                        Ouroboros.Network.Protocol.ReqResp.Codec
+                       Ouroboros.Network.Protocol.Handshake.Type
+                       Ouroboros.Network.Protocol.Handshake.Version
+                       Ouroboros.Network.Protocol.Handshake.Codec
                        Ouroboros.Network.Testing.ConcreteBlock
                        Ouroboros.Network.Block
                        Ouroboros.Network.Chain
@@ -261,6 +264,7 @@ test-suite cddl
   build-depends:       base,
                        bytestring,
                        cborg,
+                       containers,
                        fingertree,
                        hashable,
                        process-extras,
