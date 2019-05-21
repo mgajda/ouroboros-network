@@ -8,7 +8,8 @@ allMessages =
      / [3, blockFetchMessage]
      / [4, txSubmissionMessage]
      / [5, handshakeMessage]
-       [5, handshakeMessage]
+
+
 
 ; Chain Sync Protocol
 ; reference implementation of the codec in
@@ -120,7 +121,7 @@ transaction   = bytes .cbor any
 versionNumber = uint .size 4
 handshakeMessage =
        msgProposeVersions
-;    / msgAcceptVersion
+     / msgAcceptVersion
      / msgRefuse
 
 msgProposeVersions = [0 , proposeVersions]
@@ -128,7 +129,7 @@ msgProposeVersions = [0 , proposeVersions]
 ; CDDL is not expressive enough to describe the all possible values of proposeVersions.
 ; proposeVersions is a tables that maps version numbers to version parameters.
 ; The codec requires that the key are unique and in ascending order.
-; This specification only enumerates version numbers from 1..7.
+; This specification only enumerates version numbers from 1..4.
 
 params = any
 proposeVersions =
@@ -136,12 +137,9 @@ proposeVersions =
     , ? 2 => params
     , ? 3 => params
     , ? 4 => params
-    , ? 5 => params
-    , ? 6 => params
-    , ? 7 => params
     }
 
-msgAcceptVersion   = [1]
+msgAcceptVersion   = [1, versionNumber, params]
 msgRefuse          = [2, refuseReason ]
 
 refuseReason
