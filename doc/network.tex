@@ -1550,11 +1550,18 @@ a server can implement a suitable policy to throttle down a client or to disconn
 \newcommand{\Refuse}{\msg{Refuse}}
 
 \subsection{Description}
-The handshake mini protocol is used to negotiate the versions of the mini
-protocols that are used by the client and the server.
-It is run exactly when a new connection is initialized.
+The handshake mini protocol is used to negotiate the version of the protocol
+and the protocol parameters that are used by the client and the server.
+It is run exactly once when a new connection is initialized
+and consists of a single request from the client a single reply from the server.
 Section \ref{peer-setup-section} explains the live cycle of a connection and the role of
 the handshake mini protocol in more detail.
+
+The handshake mini protocol is a generic protocol that can negotiate any kind protocol parameters.
+It only assumes that protocol parameters can be encoded to, and decoded from, CBOR terms.
+A node, that runs the handshake protocol, must instanciate it with the set of
+supported protocol versions and, for each version, with the version specific functions for
+handeling the protocol parameters.
 
 \subsection{State machine}
 
@@ -1580,30 +1587,37 @@ the handshake mini protocol in more detail.
 Messages of the protocol:
 \begin{description}
 \item [\ProposeVersions{} {\boldmath $versions$}]
-      The client proposes a number of possible version.
-\item [\AcceptVersion{} {\boldmath $(version,parameters)$}]
-      The server accepts a particular combination of $version$ and $parameters$.
+      The client proposes a number of possible versions and protocol parameters.
+\item [\AcceptVersion{} {\boldmath $(versionNumber,parameters)$}]
+      The server accepts $versionNumber$ and returns possible extra protocol parameters.
 \item [\Refuse{} $reason$]
       The server refuses the proposed versions.
 \end{description}
 
 \begin{tabular}{|l|l|l|l|} \hline
 \multicolumn{4}{|c|}{Transition table} \\ \hline
-  from        & message/event      & parameters            & to          \\ \hline\hline
-  \Propose    & \ProposeVersions   & $versions$            & \Confirm    \\ \hline
-  \Confirm    & \AcceptVersion     & $(version,parameter)$ & \Done \\ \hline
-  \Confirm    & \Refuse            & $reason$              & \Done \\ \hline
+  from        & message/event      & parameters                   & to          \\ \hline\hline
+  \Propose    & \ProposeVersions   & $versionTable$              & \Confirm    \\ \hline
+  \Confirm    & \AcceptVersion     & $(versionNumber,extraParameters)$ & \Done \\ \hline
+  \Confirm    & \Refuse            & $reason$                     & \Done \\ \hline
 \end{tabular}
 
 \subsection{Client and Server Implementation}
 In a run of handshake mini protocol the peers exchange only two messages:
-The client requests to connect with a \ProposeVersions{} message that contains a map of all supported
-protocol versions
-and the server replies either with a \AcceptVersion{} message containing the negotiated version
-or a \Refuse{} message.
-Section~\ref{included-cddl} contains the CDDL-specification of the binary format of the messages.
+The client requests to connect with a \ProposeVersions{} message that contains information about
+all supported protocol versions
+and the server replies either with a \AcceptVersion{} message containing the negotiated
+$versionNumber$ and extra parameters or a \Refuse{} message.
 
-The handshake mini protocol runs before the MUS/DEMUX itself is initialized.
+Section~\ref{included-cddl} contains the CDDL-specification of the binary format of the handshake messages.
+The version table is encoded as a CBOR table with the version number as key
+and the protocol parameters as value.
+The handshake protocol requires that the version numbers ( i.e. the keys) in the version table are unique
+and appear in ascending order.
+(Note, that CDDL is not expressive enought to precisely specify that requirement on the keys of the CBOR
+table. Therefor the CDDL-specication uses a table with keys from 1 to 4 as an example.)
+
+The handshake mini protocol runs before the MUX/DEMUX itself is initialized.
 \wip{
 see in the code if this is still true:
 Each message is transmitted within a single MUX segment, i.e. with a proper segment header,

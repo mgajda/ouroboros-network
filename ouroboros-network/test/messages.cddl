@@ -124,7 +124,7 @@ handshakeMessage =
      / msgAcceptVersion
      / msgRefuse
 
-msgProposeVersions = [0 , proposeVersions]
+msgProposeVersions = [0 , versionTable]
 
 ; CDDL is not expressive enough to describe the all possible values of proposeVersions.
 ; proposeVersions is a tables that maps version numbers to version parameters.
@@ -132,14 +132,15 @@ msgProposeVersions = [0 , proposeVersions]
 ; This specification only enumerates version numbers from 1..4.
 
 params = any
-proposeVersions =
+extraParams = any
+versionTable =
     { ? 1 => params
     , ? 2 => params
     , ? 3 => params
     , ? 4 => params
     }
 
-msgAcceptVersion   = [1, versionNumber, params]
+msgAcceptVersion   = [1, versionNumber, extraParams]
 msgRefuse          = [2, refuseReason ]
 
 refuseReason
