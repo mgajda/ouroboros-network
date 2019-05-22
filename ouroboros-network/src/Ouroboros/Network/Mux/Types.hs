@@ -30,7 +30,6 @@ import           Text.Printf
 
 import           Control.Monad.Class.MonadSTM
 import           Control.Monad.Class.MonadTime
-import           Ouroboros.Network.Channel
 
 newtype RemoteClockModel = RemoteClockModel { unRemoteClockModel :: Word32 } deriving Eq
 

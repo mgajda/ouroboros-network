@@ -43,7 +43,6 @@ import           Network.TypedProtocol.Channel
 import           Network.TypedProtocol.Driver
 import           Network.TypedProtocol.Pipelined
 
-import           Ouroboros.Network.Mux.Types
 
 -- $interface
 --
