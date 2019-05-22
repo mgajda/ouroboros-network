@@ -1549,8 +1549,12 @@ a server can implement a suitable policy to throttle down a client or to disconn
 \newcommand{\AcceptVersion}{\msg{AcceptVersion}}
 \newcommand{\Refuse}{\msg{Refuse}}
 
+\newcommand{\VersionMismatch}{\msg{VersionMismatch}}
+\newcommand{\HandshakeDecodeError}{\msg{HandshakeDecodeError}}
+\newcommand{\Refused}{\msg{Refused}}
+
 \subsection{Description}
-The handshake mini protocol is used to negotiate the version of the protocol
+The handshake mini protocol is used to negotiate the protocol version
 and the protocol parameters that are used by the client and the server.
 It is run exactly once when a new connection is initialized
 and consists of a single request from the client a single reply from the server.
@@ -1559,9 +1563,9 @@ the handshake mini protocol in more detail.
 
 The handshake mini protocol is a generic protocol that can negotiate any kind protocol parameters.
 It only assumes that protocol parameters can be encoded to, and decoded from, CBOR terms.
-A node, that runs the handshake protocol, must instanciate it with the set of
-supported protocol versions and, for each version, with the version specific functions for
-handeling the protocol parameters.
+A node, that runs the handshake protocol, must instantiate it with the set of
+supported protocol versions and callback functions for handling the protocol parameters.
+These callback functions are specific for the supported protocol versions.
 
 \subsection{State machine}
 
@@ -1574,8 +1578,8 @@ handeling the protocol parameters.
 
 \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=5cm, semithick]
   \tikzstyle{every state}=[fill=red,draw=none,text=white]
-  \node[state, green, initial]                                     (Propose)       {\Propose};
-  \node[state, blue, right of=Propose]                             (Confirm)     {\Confirm};
+  \node[state, green, initial]                                     (Propose)    {\Propose};
+  \node[state, blue, right of=Propose]                             (Confirm)    {\Confirm};
   \node[state, right of=Confirm]                                   (Done)       {\Done};
 
   \draw (Propose)      edge[]      node{\ProposeVersions}          (Confirm);
@@ -1586,11 +1590,11 @@ handeling the protocol parameters.
 
 Messages of the protocol:
 \begin{description}
-\item [\ProposeVersions{} {\boldmath $versions$}]
+\item [\ProposeVersions{} {\boldmath $versionTable$}]
       The client proposes a number of possible versions and protocol parameters.
-\item [\AcceptVersion{} {\boldmath $(versionNumber,parameters)$}]
+\item [\AcceptVersion{} {\boldmath $(versionNumber,extraParameters)$}]
       The server accepts $versionNumber$ and returns possible extra protocol parameters.
-\item [\Refuse{} $reason$]
+\item [\Refuse{} {\boldmath $reason$}]
       The server refuses the proposed versions.
 \end{description}
 
@@ -1603,23 +1607,54 @@ Messages of the protocol:
 \end{tabular}
 
 \subsection{Client and Server Implementation}
-In a run of handshake mini protocol the peers exchange only two messages:
-The client requests to connect with a \ProposeVersions{} message that contains information about
-all supported protocol versions
-and the server replies either with a \AcceptVersion{} message containing the negotiated
-$versionNumber$ and extra parameters or a \Refuse{} message.
-
 Section~\ref{included-cddl} contains the CDDL-specification of the binary format of the handshake messages.
 The version table is encoded as a CBOR table with the version number as key
 and the protocol parameters as value.
 The handshake protocol requires that the version numbers ( i.e. the keys) in the version table are unique
 and appear in ascending order.
-(Note, that CDDL is not expressive enought to precisely specify that requirement on the keys of the CBOR
-table. Therefor the CDDL-specication uses a table with keys from 1 to 4 as an example.)
+(Note, that CDDL is not expressive enough to precisely specify that requirement on the keys of the CBOR
+table. Therefor the CDDL-specification uses a table with keys from 1 to 4 as an example.)
 
-The handshake mini protocol runs before the MUX/DEMUX itself is initialized.
+In a run of the handshake mini protocol the peers exchange only two messages:
+The client requests to connect with a \ProposeVersions{} message that contains information about
+all protocol versions it wants to support.
+The server replies either with an \AcceptVersion{} message containing the negotiated
+version number and extra parameters or a \Refuse{} message.
+The \Refuse{} message contains one of three alternative refuse reasons:
+\VersionMismatch{}, \HandshakeDecodeError{} or just \Refused{}.
+When a server receives a \ProposeVersions{} message it uses the following algorithm to
+compute the response:
+\begin{enumerate}
+\item
+  Compute the intersection of the set of protocol version numbers that the server support
+  and the version numbers requested by the client.
+\item
+  If the intersection is empty:
+  Reply with \Refuse-\VersionMismatch{} and the list of protocol numbers the server supports.
+\item
+  Otherwise:
+  Select the protocol with the highest version number in the intersection.
+\item
+  Runs the protocol specific decoder on the CBOR term that contains the protocol parameters.
+\item
+  If the decoder fails:
+  Reply with \Refuse-\HandshakeDecodeError, the selected version number and an error message.
+\item
+  Otherwise: Test the proposed protocol parameters of the selected protocol version
+\item
+  If the test refuses the parameters:
+  Reply with \Refuse-\Refused, the selected version number and an error message.
+\item
+  Otherwise:
+  Encode the extra parameters and
+  reply with \AcceptVersion, the selected version number and the extra parameters.
+\end{enumerate}
+Note, that in step 4), 6) and 8) the handshake protocol uses the callback functions that a specific
+for set of protocols that the server supports.
+
 \wip{
 see in the code if this is still true:
+The handshake mini protocol runs before the MUX/DEMUX itself is initialized.
 Each message is transmitted within a single MUX segment, i.e. with a proper segment header,
 but, as the MUX/DEMUX is not yet running the messages must not be split into multiple segments.
 }
