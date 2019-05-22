@@ -18,13 +18,11 @@ module Ouroboros.Network.Mux.Interface
   , MuxApplication (..)
   , clientApplication
   , serverApplication
+  , getApplications
   , MuxPeer (..)
   , simpleMuxClientApplication
   , simpleMuxServerApplication
   , NetworkNode (..)
-
-  -- * Auxiliary functions
-  , miniProtocolDescription
   ) where
 
 import           Data.ByteString.Lazy (ByteString)
@@ -109,7 +107,6 @@ data MuxApplication (appType :: AppType) ptcl m  where
     -> (ptcl -> Channel m ByteString ->  m ())
     -> MuxApplication ClientAndServerApp ptcl m
 
-
 -- |
 -- Accessor for the client side of a @'MuxApplication'@.
 --
@@ -133,6 +130,15 @@ serverApplication
   -> (ptcl -> Channel m ByteString ->  m ())
 serverApplication (MuxServerApplication app) = app
 serverApplication (MuxClientAndServerApplication _ app) = app
+
+getApplications
+  :: MuxApplication (appType :: AppType) ptcl m
+  -> ( Maybe (ptcl -> Channel m ByteString -> m ())
+     , Maybe (ptcl -> Channel m ByteString -> m ())
+     )
+getApplications (MuxClientApplication cli) = (Just cli, Nothing)
+getApplications (MuxServerApplication ser) = (Nothing, Just ser)
+getApplications (MuxClientAndServerApplication cli ser ) = (Just cli, Just ser)
 
 -- |
 -- This type is only necessary to use the @'simpleMuxClient'@ and
@@ -200,33 +206,4 @@ data NetworkNode addr m r = NetworkNode {
       -- This will cancel the thread that is listening for new connections and
       -- close the underlaying bearer.
       killNode  :: m ()
-    }
-
-
--- |
--- Transform a @'MuxPeer'@ into @'ProtocolDescription'@ used by the
--- multiplexing layer.
---
-miniProtocolDescription
-  :: forall (appType :: AppType) m ptcl.
-     ( MonadAsync m
-     , MonadCatch m
-     , MonadThrow m
-     )
-  => MuxApplication appType ptcl m
-  -> MiniProtocolDescriptions ptcl m
-miniProtocolDescription (MuxClientApplication client) = \ptcl ->
-  MiniProtocolDescription {
-      mpdInitiator = Just (client ptcl),
-      mpdResponder = Nothing
-    }
-miniProtocolDescription (MuxServerApplication server) = \ptcl ->
-  MiniProtocolDescription {
-      mpdInitiator = Nothing,
-      mpdResponder = Just (void . server ptcl)
-    }
-miniProtocolDescription (MuxClientAndServerApplication client server) = \ptcl ->
-  MiniProtocolDescription {
-      mpdInitiator = Just (void . client ptcl),
-      mpdResponder = Just (void . server ptcl)
     }

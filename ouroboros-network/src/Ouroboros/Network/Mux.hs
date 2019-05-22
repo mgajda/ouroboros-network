@@ -4,9 +4,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 
 module Ouroboros.Network.Mux (
-      MiniProtocolDescription (..)
-    , MiniProtocolDescriptions
-    , ProtocolEnum (..)
+      ProtocolEnum (..)
     , MiniProtocolId (..)
     , MiniProtocolMode (..)
     , MuxBearerState (..)
@@ -32,20 +30,22 @@ import           Data.Maybe (catMaybes)
 import           GHC.Stack
 
 import           Ouroboros.Network.Channel
+import           Ouroboros.Network.Mux.Interface
 import           Ouroboros.Network.Mux.Egress
 import           Ouroboros.Network.Mux.Ingress
 import           Ouroboros.Network.Mux.Types
 
+
 -- | muxStart starts a mux bearer for the specified protocols corresponding to
 -- one of the provided Versions.
 -- TODO: replace MonadSay with iohk-monitoring-framework.
-muxStart :: forall m ptcl.
+muxStart :: forall m appType ptcl.
             ( MonadAsync m, MonadFork m, MonadSay m, MonadSTM m, MonadThrow m , MonadMask m
             , Ord ptcl, Enum ptcl, Bounded ptcl)
-         => MiniProtocolDescriptions ptcl m
+         => MuxApplication appType ptcl m
          -> MuxBearer ptcl m
          -> m ()
-muxStart udesc bearer = do
+muxStart app bearer = do
     tbl <- setupTbl
     tq <- atomically $ newTBQueue 100
     cnt <- newTVarM 0
@@ -76,13 +76,16 @@ muxStart udesc bearer = do
                         | ptcl <- [minBound..maxBound]
                         , mode <- [ModeInitiator, ModeResponder] ]
 
+
     mpsJob
       :: TVar m Int
       -> PerMuxSharedState ptcl m
       -> ptcl
       -> m [m ()]
     mpsJob cnt pmss mpdId = do
-        let mpd = udesc mpdId
+
+        let (mClientApp, mServerApp) = getApplications app
+
         w_i <- atomically newEmptyTMVar
         w_r <- atomically newEmptyTMVar
 
@@ -99,9 +102,9 @@ muxStart udesc bearer = do
                                 w_r cnt
 
         return $ map (>> mpsJobExit cnt) $ catMaybes
-          [ mpdInitiator mpd <*> Just initiatorChannel
+          [ mClientApp <*> Just mpdId <*> Just initiatorChannel
                 
-          , mpdResponder mpd <*> Just responderChannel
+          , mServerApp <*> Just mpdId <*> Just responderChannel
           ]
 
     -- cnt represent the number of SDUs that are queued but not yet sent.  Job
