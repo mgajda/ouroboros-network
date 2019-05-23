@@ -246,22 +246,42 @@ test-suite cddl
                        Ouroboros.Network.Protocol.BlockFetch.Codec
                        Ouroboros.Network.Protocol.BlockFetch.Type
                        Ouroboros.Network.Protocol.ChainSync.Codec
+                       Ouroboros.Network.Protocol.ChainSync.Test
                        Ouroboros.Network.Protocol.ChainSync.Type
                        Ouroboros.Network.Protocol.PingPong.Codec
+                       Ouroboros.Network.Protocol.ReqResp.Test
                        Ouroboros.Network.Protocol.ReqResp.Codec
                        Ouroboros.Network.Testing.ConcreteBlock
                        Ouroboros.Network.Block
                        Ouroboros.Network.Chain
                        Ouroboros.Network.Codec
+                       Ouroboros.Network.ChainProducerState
+                       Ouroboros.Network.Channel
+                       Ouroboros.Network.Protocol.ChainSync.Client
+                       Ouroboros.Network.Protocol.ChainSync.Direct
+                       Ouroboros.Network.Protocol.ChainSync.Examples
+                       Ouroboros.Network.Protocol.ChainSync.Server
+                       Test.ChainGenerators
+                       Test.ChainProducerState
+                       Test.Ouroboros.Network.Testing.Utils
+
   default-language:    Haskell2010
   build-depends:       base,
                        bytestring,
                        cborg,
                        fingertree,
                        hashable,
+                       network,
+                       process,
                        process-extras,
+                       QuickCheck,
                        serialise,
+                       tasty,
+                       tasty-quickcheck,
                        text,
+                       time,
+                       contra-tracer,
+                       io-sim,
                        io-sim-classes,
                        typed-protocols
   ghc-options:         -Wall

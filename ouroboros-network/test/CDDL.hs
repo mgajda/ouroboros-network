@@ -2,24 +2,34 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
-module Main
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts #-}
+module CDDL
 where
 
 import System.Exit (ExitCode(..))
 import System.Process.ByteString.Lazy
 import Control.Monad
 import Control.Exception.Base (throw)
+import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Lazy as BS
 import Data.ByteString.Lazy (ByteString)
 import Data.ByteString.Lazy.Char8 as Char8 (putStrLn, unpack, lines)
 import qualified Codec.Serialise.Class as Serialise
 import Codec.CBOR.Decoding (decodeWord, decodeListLenOf, decodeBytes)
+import Codec.CBOR.Encoding (encodeBytes, encodeListLen, encodeWord)
+import Codec.CBOR.Term
 import Codec.CBOR.Read
+import Codec.CBOR.Write
 
+import Test.QuickCheck
+import Ouroboros.Network.Chain
+import Ouroboros.Network.Protocol.ChainSync.Test as CS ()
 import Ouroboros.Network.Protocol.ChainSync.Type as CS
 import Ouroboros.Network.Protocol.ChainSync.Codec (codecChainSync)
 import Network.TypedProtocol.ReqResp.Type as ReqResp
 import Ouroboros.Network.Protocol.ReqResp.Codec (codecReqResp)
+import Ouroboros.Network.Protocol.ReqResp.Test as ReqResp ()
 import Ouroboros.Network.Protocol.PingPong.Codec (codecPingPong)
 import Network.TypedProtocol.PingPong.Type as PingPong
 import Ouroboros.Network.Protocol.BlockFetch.Codec (codecBlockFetch)
@@ -64,10 +74,14 @@ decodeFile :: FilePath -> IO ()
 decodeFile f =
     BS.readFile f >>= decodeMsg . decodeTopTerm
 
-data DummyBytes = DummyBytes
+data DummyBytes = DummyBytes BSI.ByteString
+
 instance Serialise.Serialise DummyBytes where
-    encode _ = error "encode Serialise DummyBytes"
-    decode = decodeBytes >> return DummyBytes
+    encode (DummyBytes b) = encodeBytes b
+    decode = DummyBytes <$> decodeBytes
+
+instance Arbitrary DummyBytes where
+    arbitrary = (DummyBytes . BSI.packBytes) <$> arbitrary
 
 type MonoCodec x = Codec x Codec.CBOR.Read.DeserialiseFailure IO ByteString
 
@@ -114,7 +128,8 @@ decodeMsg (tag, input) = case tag of
              -> PeerHasAgency pr st -> IO Bool
         run codec state = runCodec ((decode codec) state) input
 
-        runCS = run (codecChainSync Serialise.encode Serialise.decode Serialise.encode Serialise.decode :: MonoCodec CS)
+        runCS = run (codecChainSync Serialise.encode Serialise.decode Serialise.encode
+                                    Serialise.decode :: MonoCodec CS)
         chainSyncParsers = [
               runCS (ClientAgency CS.TokIdle)
             , runCS (ServerAgency (CS.TokNext TokCanAwait))
@@ -135,9 +150,49 @@ decodeMsg (tag, input) = case tag of
             , runPingPong (ServerAgency PingPong.TokBusy)
             ]
 
-        runBlockFetch = run (codecBlockFetch Serialise.encode Serialise.encode Serialise.decode Serialise.decode :: MonoCodec BF)
+        runBlockFetch = run (codecBlockFetch Serialise.encode Serialise.encode Serialise.decode
+                                             Serialise.decode :: MonoCodec BF)
         blockFetchParsers = [
               runBlockFetch (ClientAgency BlockFetch.TokIdle)
             , runBlockFetch (ServerAgency BlockFetch.TokBusy)
             , runBlockFetch (ServerAgency BlockFetch.TokStreaming)
             ]
+
+data Protocol ps where
+    CS :: Protocol (ChainSync BlockHeader (Point BlockHeader))
+    ReqResp :: Protocol RR
+
+data Msg where
+    Msg :: Protocol ps -> PeerHasAgency pr (st :: ps) -> Message ps (st :: ps) (st' :: ps) -> Msg
+
+instance Arbitrary Msg where
+    arbitrary = oneof [
+         genProtocol CS
+        ,genProtocol ReqResp
+        ]
+
+protocolToTag :: Protocol ps -> Word
+protocolToTag p = case p of
+    CS -> 1
+    ReqResp -> 2
+
+protocolToCodec :: Protocol ps -> MonoCodec ps
+protocolToCodec p = case p of
+    CS      -> codecChainSync Serialise.encode Serialise.decode Serialise.encode Serialise.decode
+    ReqResp -> codecReqResp
+
+genProtocol :: Arbitrary (AnyMessageAndAgency ps) => Protocol ps -> Gen Msg
+genProtocol protocol = do
+    (AnyMessageAndAgency agency msg) <- arbitrary
+    return $ Msg protocol agency msg
+
+encodeMsg :: Msg -> ByteString
+encodeMsg (Msg protocol agency msg)
+      -- Put msg into a wrapper CBOR term.
+    = toLazyByteString (encodeListLen 2 <> (encodeWord $ protocolToTag protocol) <> encodeTerm body)
+    where
+        innerBS = encode (protocolToCodec protocol) agency msg
+        -- Reparse the ByteString from the codec.
+        body = case deserialiseFromBytes decodeTerm innerBS of
+            Right (_,res) -> res
+            Left err -> error $ "encodeMsg : internal error :" ++ show err
