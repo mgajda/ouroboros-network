@@ -63,9 +63,23 @@ generateCBORDiag cddlCmd cddlSpec rounds = do
             Char8.putStrLn err
             return $ Char8.lines diags
 
+validateCBORDiag :: FilePath -> FilePath -> ByteString -> IO Bool
+validateCBORDiag cddlCmd cddlSpec cbor = do
+    result <- readProcessWithExitCode cddlCmd [cddlSpec, "validate", "-"] cbor
+    case result of
+        (ExitFailure _, _, err) -> error $ Char8.unpack err
+        (ExitSuccess, _, _) -> return True
+
 diagToBytes :: FilePath -> ByteString -> IO ByteString
 diagToBytes diag2cborCmd diag = do
     result <- readProcessWithExitCode diag2cborCmd ["-"] diag
+    case result of
+        (ExitFailure _ , _, err) -> error $ Char8.unpack err
+        (ExitSuccess, bytes, _) -> return bytes
+
+bytesToDiag :: FilePath -> ByteString -> IO ByteString
+bytesToDiag cbor2diagCmd diag = do
+    result <- readProcessWithExitCode cbor2diagCmd ["-"] diag
     case result of
         (ExitFailure _ , _, err) -> error $ Char8.unpack err
         (ExitSuccess, bytes, _) -> return bytes
@@ -167,14 +181,14 @@ data Msg where
 
 instance Arbitrary Msg where
     arbitrary = oneof [
-         genProtocol CS
-        ,genProtocol ReqResp
+--         genProtocol CS
+         genProtocol ReqResp
         ]
 
 protocolToTag :: Protocol ps -> Word
 protocolToTag p = case p of
-    CS -> 1
-    ReqResp -> 2
+    CS -> 0
+    ReqResp -> 1
 
 protocolToCodec :: Protocol ps -> MonoCodec ps
 protocolToCodec p = case p of
@@ -196,3 +210,24 @@ encodeMsg (Msg protocol agency msg)
         body = case deserialiseFromBytes decodeTerm innerBS of
             Right (_,res) -> res
             Left err -> error $ "encodeMsg : internal error :" ++ show err
+
+{-
+prop_cddl_accepts :: Msg -> PropertyM IO Bool
+prop_cddl_accepts msg = do
+
+
+
+generateAndDecode :: FilePath -> FilePath -> FilePath -> Int -> IO ()
+generateAndDecode cddlCmd diag2cborCmd cddlSpec rounds = do
+    diags <- generateCBORDiag cddlCmd cddlSpec rounds
+    forM_ diags $ \diag -> do
+        Char8.putStrLn diag
+        bytes <- diagToBytes diag2cborCmd diag
+        decodeMsg $ decodeTopTerm bytes
+-}
+
+encodeAndValidate :: FilePath -> FilePath -> FilePath -> Msg -> IO Bool
+encodeAndValidate cddlCmd cbor2diagCmd cddlSpec msg = do
+    diag <- bytesToDiag cbor2diagCmd $ encodeMsg msg
+    validateCBORDiag cddlCmd cddlSpec diag
+
