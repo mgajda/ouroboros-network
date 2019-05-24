@@ -7,6 +7,7 @@ module Ouroboros.Storage.IO (
     , write
     , close
     , getSize
+    , sameError
     ) where
 
 import           Prelude hiding (read, truncate)
@@ -20,7 +21,7 @@ import           Foreign (Int64, Ptr)
 import           System.Win32 hiding (setFilePointerEx)
 
 import           Ouroboros.Storage.FS.API.Types (AllowExisting (..),
-                     OpenMode (..), SeekMode (..))
+                     FsError (..), OpenMode (..), SeekMode (..))
 import           Ouroboros.Storage.FS.Handle
 import           Ouroboros.Storage.Seek (setFilePointerEx)
 
@@ -84,3 +85,28 @@ close fh = closeHandleOS fh closeHandle
 getSize :: FHandle -> IO Word64
 getSize fh = withOpenHandle "getSize" fh $ \h -> do
   fromIntegral . bhfiSize <$>  getFileInformationByHandle h
+
+-- | For the following error types, our mock FS implementation (and the Posix
+-- implementation) throw the same errors:
+--
+-- * 'FsReachedEOF'
+-- * 'FsDeviceFull'
+-- * 'FsResourceAlreadyInUse'
+--
+-- For other cases, Windows throws different errors than the mock FS
+-- implementation.
+sameError :: FsError -> FsError -> Bool
+sameError e1 e2 = fsErrorPath e1 == fsErrorPath e2
+               && sameFsErrorType (fsErrorType e1) (fsErrorType e2)
+  where
+    sameFsErrorType ty1 ty2 = case (ty1, ty2) of
+      (FsReachedEOF,           FsReachedEOF)           -> True
+      (FsReachedEOF,           _)                      -> False
+      (_,                      FsReachedEOF)           -> False
+      (FsDeviceFull            FsDeviceFull)           -> True
+      (FsDeviceFull,           _)                      -> False
+      (_,                      FsDeviceFull)           -> False
+      (FsResourceAlreadyInUse, FsResourceAlreadyInUse) -> True
+      (FsResourceAlreadyInUse, _)                      -> False
+      (_,                      FsResourceAlreadyInUse) -> False
+      (_,                      _)                      -> True
