@@ -24,6 +24,9 @@ module Ouroboros.Network.BlockFetch.Decision (
 
 import qualified Data.Set as Set
 
+import           Data.List (sortBy, groupBy, transpose)
+import           Data.Function (on)
+
 import           Control.Exception (assert)
 import           Control.Monad (guard)
 
@@ -41,7 +44,9 @@ import           Ouroboros.Network.BlockFetch.ClientState
 import           Ouroboros.Network.BlockFetch.DeltaQ
                    ( PeerGSV(..), SizeInBytes
                    , PeerFetchInFlightLimits(..)
-                   , calculatePeerFetchInFlightLimits )
+                   , calculatePeerFetchInFlightLimits
+                   , estimateResponseDeadlineProbability
+                   , estimateExpectedResponseDuration )
 
 
 data FetchDecisionPolicy header = FetchDecisionPolicy {
@@ -148,6 +153,7 @@ fetchDecisions fetchDecisionPolicy@FetchDecisionPolicy {
 
     -- Reorder chains based on consensus policy and network timing data.
   . prioritisePeerChains
+      fetchMode
       compareCandidateChains
       blockFetchSize
   . map swizzleIG
@@ -170,10 +176,10 @@ fetchDecisions fetchDecisionPolicy@FetchDecisionPolicy {
       currentChain
   where
     -- Data swizzling functions to get the right info into each stage.
-    swizzleI   (c, p@(_,     inflight,_,   _)) = (        c,         inflight,       p)
-    swizzleIG  (c, p@(_,     inflight,gsvs,_)) = (        c,         inflight, gsvs, p)
-    swizzleSI  (c, p@(status,inflight,_,   _)) = (snd <$> c, status, inflight,       p)
-    swizzleSIG (c, p@(status,inflight,gsvs,_)) = (        c, status, inflight, gsvs, p)
+    swizzleI   (c, p@(_,     inflight,_,   _)) = (c,         inflight,       p)
+    swizzleIG  (c, p@(_,     inflight,gsvs,_)) = (c,         inflight, gsvs, p)
+    swizzleSI  (c, p@(status,inflight,_,   _)) = (c, status, inflight,       p)
+    swizzleSIG (c, p@(status,inflight,gsvs,_)) = (c, status, inflight, gsvs, p)
 
 {-
 We have the node's /current/ or /adopted/ chain. This is the node's chain in
@@ -525,15 +531,158 @@ filterNotAlreadyInFlightWithOtherPeers FetchModeBulkSync chains =
 
 
 prioritisePeerChains
-  :: HasHeader header
-  => (AnchoredFragment header -> AnchoredFragment header -> Ordering)
+  :: forall header peer. HasHeader header
+  => FetchMode
+  -> (AnchoredFragment header -> AnchoredFragment header -> Ordering)
   -> (header -> SizeInBytes)
   -> [(FetchDecision (CandidateFragments header), PeerFetchInFlight header,
                                                   PeerGSV,
                                                   peer)]
-  -> [(FetchDecision (CandidateFragments header), peer)]
-prioritisePeerChains _compareCandidateChains _blockFetchSize =
-    map (\(c,_,_,p) -> (c,p))
+  -> [(FetchDecision [ChainFragment header],      peer)]
+prioritisePeerChains FetchModeDeadline compareCandidateChains blockFetchSize =
+    --TODO: last tie-breaker is still original order (which is probably
+    -- peerid order). We should use a random tie breaker so that adversaries
+    -- cannot get any advantage.
+
+    map (\(decision, peer) ->
+            (fmap (\(_,_,fragment) -> fragment) decision, peer))
+  . concatMap ( concat
+              . transpose
+              . groupBy (equatingFst $
+                           equatingRight
+                             ((==) `on` chainHeadPoint))
+              . sortBy  (comparingFst $
+                           comparingRight
+                             (compare `on` chainHeadPoint))
+              )
+  . groupBy (equatingFst $
+               equatingRight $
+                 equatingTriple
+                   (==)    -- probability band
+                   (equateCandidateChains `on` getChainSuffix)
+                   (\_ _ -> True))
+  . sortBy  (descendingOrder $
+               comparingFst $
+                 comparingRight $
+                   comparingTriple
+                     compare -- probability band
+                     (compareCandidateChains `on` getChainSuffix)
+                     mempty)
+  . map annotateProbabilityBand
+  where
+    annotateProbabilityBand (Left decline, _, _, peer) = (Left decline, peer)
+    annotateProbabilityBand (Right (chain,fragments), inflight, gsvs, peer) =
+        (Right (band, chain, fragments), peer)
+      where
+        band = probabilityBand $
+                 estimateResponseDeadlineProbability
+                   gsvs
+                   (peerFetchBytesInFlight inflight)
+                   (totalFetchSize blockFetchSize fragments)
+                   deadline
+
+    deadline = 2 -- seconds -- TODO: get this from external info
+
+    equateCandidateChains chain1 chain2
+      | EQ <- compareCandidateChains chain1 chain2 = True
+      | otherwise                                  = False
+
+    chainHeadPoint (_,ChainSuffix c,_) = AnchoredFragment.headPoint c
+
+prioritisePeerChains FetchModeBulkSync compareCandidateChains blockFetchSize =
+    map (\(decision, peer) ->
+            (fmap (\(_, fragment) -> fragment) decision, peer))
+  . sortBy (comparingFst $
+              comparingRight $
+                comparingFst
+                  (compareCandidateChains  `on` getChainSuffix))
+  . map annotateProbabilityBand
+  where
+    annotateProbabilityBand (Left decline, _, _, peer) = (Left decline, peer)
+    annotateProbabilityBand (Right (chain,fragments), inflight, gsvs, peer) =
+        (Right (chain, fragments), peer)
+      where
+        --TODO: use this to help prioritise
+        _duration = estimateExpectedResponseDuration
+                      gsvs
+                      (peerFetchBytesInFlight inflight)
+                      (totalFetchSize blockFetchSize fragments)
+
+totalFetchSize :: HasHeader header
+               => (header -> SizeInBytes)
+               -> [ChainFragment header]
+               -> SizeInBytes
+totalFetchSize blockFetchSize fragments =
+  sum [ blockFetchSize header
+      | fragment <- fragments
+      , header   <- ChainFragment.toOldestFirst fragment ]
+
+type Comparing a = a -> a -> Ordering
+type Equating  a = a -> a -> Bool
+
+descendingOrder :: Comparing a -> Comparing a
+descendingOrder cmp = flip cmp
+
+comparingTriple :: Comparing a -> Comparing b -> Comparing c
+                -> Comparing (a, b, c)
+comparingTriple cmpA cmpB cmpC
+                (a1, b1, c1)
+                (a2, b2, c2) = cmpA a1 a2
+                            <> cmpB b1 b2
+                            <> cmpC c1 c2
+
+equatingTriple :: Equating a -> Equating b -> Equating c -> Equating (a, b, c)
+equatingTriple eqA eqB eqC
+               (a1, b1, c1)
+               (a2, b2, c2) = eqA a1 a2
+                           && eqB b1 b2
+                           && eqC c1 c2
+
+comparingEither :: Comparing a -> Comparing b -> Comparing (Either a b)
+comparingEither _ _    (Left  _) (Right _) = LT
+comparingEither cmpA _ (Left  x) (Left  y) = cmpA x y
+comparingEither _ cmpB (Right x) (Right y) = cmpB x y
+comparingEither _ _    (Right _) (Left  _) = GT
+
+equatingEither :: Equating a -> Equating b -> Equating (Either a b)
+equatingEither _ _   (Left  _) (Right _) = False
+equatingEither eqA _ (Left  x) (Left  y) = eqA x y
+equatingEither _ eqB (Right x) (Right y) = eqB x y
+equatingEither _ _   (Right _) (Left  _) = False
+
+comparingFst :: Comparing a -> Comparing (a, b)
+comparingFst cmp = cmp `on` fst
+
+equatingFst :: Equating a -> Equating (a, b)
+equatingFst eq = eq `on` fst
+
+comparingRight :: Comparing b -> Comparing (Either a b)
+comparingRight = comparingEither mempty
+
+equatingRight :: Equating b -> Equating (Either a b)
+equatingRight = equatingEither (\_ _ -> True)
+
+-- | Given the 'PeerGSV', size of blocks to download, calculate the probability
+-- of the download completing within the deadline. Classify that probability
+-- into one of three broad bands: high, medium and low.
+--
+-- The bands are
+--
+-- * high:    98% -- 100%
+-- * medium:  75% --  98%
+-- * low:      0% --  75%
+--
+probabilityBand :: Double -> ProbabilityBand
+probabilityBand p
+  | p > 0.98  = ProbabilityHigh
+  | p > 0.75  = ProbabilityModerate
+  | otherwise = ProbabilityLow
+ -- TODO: for hysteresis, increase probability if we're already using this peer
+
+data ProbabilityBand = ProbabilityLow
+                     | ProbabilityModerate
+                     | ProbabilityHigh
+  deriving (Eq, Ord, Show)
 
 
 {-
