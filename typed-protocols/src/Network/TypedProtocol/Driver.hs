@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
@@ -23,6 +24,8 @@ module Network.TypedProtocol.Driver (
 
   -- * Normal peers
   runPeer,
+  runPeerWithByteLimit,
+  runPeerWith,
   TraceSendRecv(..),
 
   -- * Pipelined peers
@@ -34,10 +37,14 @@ module Network.TypedProtocol.Driver (
 
   -- * Driver utilities
   -- | This may be useful if you want to write your own driver.
+  ByteLimit (..),
+  DecoderFailureOrTooMuchInput (..),
   runDecoderWithChannel,
   ) where
 
 import Data.Void (Void)
+import Data.Int (Int64)
+import Data.Maybe (fromMaybe)
 
 import Network.TypedProtocol.Core
 import Network.TypedProtocol.Pipelined
@@ -90,20 +97,23 @@ instance Show (AnyMessage ps) => Show (TraceSendRecv ps) where
 -- Driver for normal peers
 --
 
--- | Run a peer with the given channel via the given codec.
---
--- This runs the peer to completion (if the protocol allows for termination).
---
-runPeer
-  :: forall ps (st :: ps) pr failure bytes m a .
-     (MonadThrow m, Exception failure)
+runPeerWith
+  :: forall ps (st :: ps) pr failure err bytes m a .
+     ( MonadThrow m
+     , Exception err
+     )
   => Tracer m (TraceSendRecv ps)
   -> Codec ps failure m bytes
   -> Channel m bytes
+  -> (forall (st' :: ps) pr' x .
+           PeerHasAgency pr' st'
+        -> Channel m bytes
+        -> Maybe bytes
+        -> DecodeStep bytes failure m x
+        -> m (Either err (x, Maybe bytes)))
   -> Peer ps pr st m a
   -> m a
-
-runPeer tr Codec{encode, decode} channel@Channel{send} =
+runPeerWith tr Codec{encode, decode} channel@Channel{send} fn =
     go Nothing
   where
     go :: forall st'.
@@ -126,7 +136,7 @@ runPeer tr Codec{encode, decode} channel@Channel{send} =
 
     go trailing (Await stok k) = do
       decoder <- decode stok
-      res <- runDecoderWithChannel channel trailing decoder
+      res <- fn stok channel trailing decoder
       case res of
         Right (SomeMessage msg, trailing') -> do
           traceWith tr (TraceRecvMsg (AnyMessage msg))
@@ -147,6 +157,37 @@ runPeer tr Codec{encode, decode} channel@Channel{send} =
     -- of the next protocol arrives in the same data chunk as the final
     -- message of the previous protocol.
 
+-- | Run a peer with the given channel via the given codec.
+--
+-- This runs the peer to completion (if the protocol allows for termination).
+--
+runPeer
+  :: forall ps (st :: ps) pr failure bytes m a .
+     (MonadThrow m, Exception failure)
+  => Tracer m (TraceSendRecv ps)
+  -> Codec ps failure m bytes
+  -> Channel m bytes
+  -> Peer ps pr st m a
+  -> m a
+
+runPeer tr codec channel = runPeerWith tr codec channel (\_stok -> runDecoderWithChannel Nothing)
+
+-- |
+-- Like @'runPeer'@, but require that each inbound message is smaller than
+-- @limit@ bytes; if the limit is exceeded throw @'TooMuchInput'@ exception.
+--
+runPeerWithByteLimit
+  :: forall ps (st :: ps) pr bytes failure m a .
+     (MonadThrow m, Exception failure)
+  => ByteLimit bytes
+  -> Tracer m (TraceSendRecv ps)
+  -> Codec ps failure m bytes
+  -> Channel m bytes
+  -> Peer ps pr st m a
+  -> m a
+
+runPeerWithByteLimit limit tr codec channel =
+  runPeerWith tr codec channel (\_stok -> runDecoderWithChannel (Just limit))
 
 --
 -- Driver for pipelined peers
@@ -344,7 +385,7 @@ runPipelinedPeerReceiver tr Codec{decode} channel = go
 
     go trailing (ReceiverAwait stok k) = do
       decoder <- decode stok
-      res <- runDecoderWithChannel channel trailing decoder
+      res <- runDecoderWithChannel Nothing channel trailing decoder
       case res of
         Right (SomeMessage msg, trailing') -> do
           traceWith tr (TraceRecvMsg (AnyMessage msg))
@@ -357,21 +398,49 @@ runPipelinedPeerReceiver tr Codec{decode} channel = go
 -- Utils
 --
 
+data DecoderFailureOrTooMuchInput failure
+  = DecoderFailure !failure
+  | TooMuchInput
+  deriving (Show)
+
+instance Exception failure => Exception (DecoderFailureOrTooMuchInput failure)
+
+data ByteLimit bytes = ByteLimit {
+      byteLimit  :: !Int64,
+      byteLength :: !(bytes -> Int64)
+    }
+
 -- | Run a codec incremental decoder 'DecodeStep' against a channel. It also
 -- takes any extra input data and returns any unused trailing data.
 --
-runDecoderWithChannel :: Monad m
-                      => Channel m bytes
-                      -> Maybe bytes
-                      -> DecodeStep bytes failure m a
-                      -> m (Either failure (a, Maybe bytes))
+runDecoderWithChannel
+    :: forall m bytes failure a. Monad m
+    => Maybe (ByteLimit bytes)
+    -> Channel m bytes
+    -> Maybe bytes
+    -> DecodeStep bytes failure m a
+    -> m (Either (DecoderFailureOrTooMuchInput failure) (a, Maybe bytes))
+runDecoderWithChannel limit Channel{recv} mbytes = go 0 mbytes
+    where
+      go :: Int64
+         -- ^ length of consumed input
+         -> Maybe bytes
+         -> DecodeStep bytes failure m a
+         -> m (Either (DecoderFailureOrTooMuchInput failure) (a, Maybe bytes))
+      -- we decoded the data, but we might be over the limit
+      go !l _  (DecodeDone x trailing) | Just ByteLimit {byteLimit, byteLength} <- limit
+                                       , (l - maybe 0 byteLength trailing) > byteLimit = return (Left TooMuchInput)
+                                       | otherwise                                     = return (Right (x, trailing))
+      -- we run over the limit, return @TooMuchInput@ error
+      go !l _  _                       | Just ByteLimit {byteLimit} <- limit
+                                       , l > byteLimit = return (Left TooMuchInput)
+      go !_ _  (DecodeFail failure)    = return (Left (DecoderFailure failure))
 
-runDecoderWithChannel Channel{recv} = go
-  where
-    go _ (DecodeDone x trailing) = return (Right (x, trailing))
-    go _ (DecodeFail failure)    = return (Left failure)
-    go Nothing         (DecodePartial k) = recv >>= k        >>= go Nothing
-    go (Just trailing) (DecodePartial k) = k (Just trailing) >>= go Nothing
+      go !l Nothing         (DecodePartial k) =
+        recv >>= (\mbs -> k mbs >>= go (l + (fromMaybe 0 (byteLength <$> limit <*> mbs))) Nothing)
+
+      go !l (Just trailing) (DecodePartial k) =
+        k (Just trailing) >>= go (l + (fromMaybe 0 (byteLength <$> limit <*> Just trailing))) Nothing
 
 
 -- | Run two 'Peer's via a pair of connected 'Channel's and a common 'Codec'.

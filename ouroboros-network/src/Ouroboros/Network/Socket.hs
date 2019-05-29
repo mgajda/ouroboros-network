@@ -46,7 +46,7 @@ import qualified Network.Socket.ByteString.Lazy as Socket (recv, sendAll)
 
 import           Control.Tracer (nullTracer)
 
-import           Network.TypedProtocol.Driver.ByteLimit
+import           Network.TypedProtocol.Driver
 
 import           Ouroboros.Network.Time
 import           Ouroboros.Network.Protocol.Handshake.Type
@@ -195,8 +195,7 @@ connectToNode encodeData decodeData versions localAddr remoteAddr =
           Socket.connect sd (Socket.addrAddress remoteAddr)
           Mx.muxBearerSetState bearer Mx.Connected
           mapp <- runPeerWithByteLimit
-                    maxTransmissionUnit
-                    BL.length
+                    (ByteLimit maxTransmissionUnit BL.length)
                     nullTracer
                     codecHandshake
                     (Mx.muxBearerAsControlChannel bearer Mx.ModeInitiator)
@@ -269,8 +268,7 @@ beginConnection encodeData decodeData acceptVersion fn addr st = do
         (bearer :: MuxBearer ptcl IO) <- socketAsMuxBearer sd
         Mx.muxBearerSetState bearer Mx.Connected
         mapp <- runPeerWithByteLimit
-                maxTransmissionUnit
-                BL.length
+                (ByteLimit maxTransmissionUnit BL.length)
                 nullTracer
                 codecHandshake
                 (Mx.muxBearerAsControlChannel bearer Mx.ModeResponder)

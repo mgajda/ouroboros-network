@@ -14,7 +14,6 @@ import Network.TypedProtocol.Codec
 import Network.TypedProtocol.Proofs
 import Network.TypedProtocol.Channel
 import Network.TypedProtocol.Driver
-import Network.TypedProtocol.Driver.ByteLimit
 
 import Network.TypedProtocol.ReqResp.Type
 import Network.TypedProtocol.ReqResp.Client
@@ -59,7 +58,7 @@ tests = testGroup "Network.TypedProtocol.ReqResp"
   , testProperty "codec 3-splits"      (withMaxSuccess 33
                                        prop_codec_splits3_ReqResp)
 
-  , testProperty "runPeerWithByteLimit ST"
+  , testProperty "runPeerWithuyteLimit ST"
                                        prop_runPeerWithByteLimit_ST
   , testProperty "runPeerWithByteLimit IO"
                                        prop_runPeerWithByteLimit_IO
@@ -200,7 +199,7 @@ prop_runPeerWithByteLimit limit reqPayloads = do
       (c1, c2) <- createConnectedChannels
 
       res <- try $
-        runPeerWithByteLimit limit (fromIntegral . length) nullTracer codecReqResp c1 recvPeer
+        runPeerWithByteLimit (ByteLimit limit (fromIntegral . length)) nullTracer codecReqResp c1 recvPeer
           `concurrently`
         void (runPeer nullTracer codecReqResp c2 sendPeer)
 
