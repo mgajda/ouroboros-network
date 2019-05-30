@@ -282,11 +282,17 @@ dbAppendImpl err tracer epochSlots iwrite idb = DBAppend $ \blockToWrite -> do
       pure slot
     CardanoBlockToWrite (Annotated (Cardano.ABOBBlock blk) _) -> do
       let hash = Cardano.blockHashAnnotated blk
+          -- "flat" slot id is relative to genesis ...
           flatSlotId = Cardano.blockSlot blk
+          -- ... which is what we need for the ImmutableDB ...
           slot = Cardano.unFlatSlotId flatSlotId
+          -- ... but we want to "unfaltten" it to get the epoch and local
+          -- slot (relative to epoch) for the index.
           slotId = Cardano.unflattenSlotId epochSlots flatSlotId
           Cardano.EpochIndex epoch = Cardano.siEpoch slotId
-      Index.updateTip iwrite (coerceHashToLegacy hash) (EpochNo epoch) (Index.RealSlot slot)
+          -- LocalSlotIndex gives a Word16. We cast to Word64
+          wslot = fromIntegral (Cardano.unLocalSlotIndex (Cardano.siSlot slotId))
+      Index.updateTip iwrite (coerceHashToLegacy hash) (EpochNo epoch) (Index.RealSlot wslot)
       Immutable.appendBinaryBlob idb (SlotNo slot) builder
       pure (SlotNo slot)
     CardanoBlockToWrite (Annotated (Cardano.ABOBBoundary ebb) _) -> do
