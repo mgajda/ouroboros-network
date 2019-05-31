@@ -9,6 +9,7 @@ import qualified Test.ChainFragment (tests)
 import qualified Test.ChainProducerState (tests)
 import qualified Test.Mux (tests)
 import qualified Test.Pipe (tests)
+import qualified Test.Subscription (tests)
 import qualified Test.Ouroboros.Network.Node (tests)
 import qualified Test.Ouroboros.Network.BlockFetch (tests)
 import qualified Ouroboros.Network.Protocol.ChainSync.Test (tests)
@@ -43,6 +44,7 @@ tests =
   , Test.Mux.tests
   , Test.Pipe.tests
   , Test.Socket.tests
+  , Test.Subscription.tests
   , Test.Ouroboros.Network.BlockFetch.tests
 
     -- pseudo system-level

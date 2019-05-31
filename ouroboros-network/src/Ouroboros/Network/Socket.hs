@@ -14,6 +14,7 @@ module Ouroboros.Network.Socket (
     , withServerNode
     , withSimpleServerNode
     , connectTo
+    , connectTo'
 
     -- * Helper function for creating servers
     , socketAsMuxBearer
@@ -188,25 +189,56 @@ connectTo encodeData decodeData versions localAddr remoteAddr =
 #if !defined(mingw32_HOST_OS)
               Socket.setSocketOption sd Socket.ReusePort 1
 #endif
-          bearer <- socketAsMuxBearer sd
           case localAddr of
             Just addr -> Socket.bind sd (Socket.addrAddress addr)
             Nothing   -> return ()
           Socket.connect sd (Socket.addrAddress remoteAddr)
-          Mx.muxBearerSetState bearer Mx.Connected
-          mapp <- runPeerWithByteLimit
-                    maxTransmissionUnit
-                    BL.length
-                    nullTracer
-                    codecHandshake
-                    (Mx.muxBearerAsControlChannel bearer Mx.ModeInitiator)
-                    (handshakeClientPeer encodeData decodeData versions)
-          case mapp of
-            Left err -> throwIO err
-            Right app -> do
-              Mx.muxBearerSetState bearer Mx.Mature
-              Mx.muxStart app bearer
+          connectTo' encodeData decodeData versions sd
       )
+
+-- |
+-- Connect to a remote node using an existing socket. It us up to to caller to
+-- ensure that the socket is closed in case of an exception.
+--
+-- The connection will start with handshake protocol sending @Versions@ to the
+-- remote peer.  It must fit into @'maxTransmissionUnit'@ (~5k bytes).
+--
+-- Exceptions thrown by @'MuxApplication'@ are rethrown by @'connectTo'@.
+connectTo'
+  :: forall ptcl vNumber extra.
+     ( Mx.ProtocolEnum ptcl
+     , Ord ptcl
+     , Enum ptcl
+     , Bounded ptcl
+     , Ord vNumber
+     , Enum vNumber
+     , Serialise vNumber
+     , Typeable vNumber
+     , Show vNumber
+     , Show ptcl
+     , Mx.MiniProtocolLimits ptcl
+     )
+  => (forall vData. extra vData -> vData -> CBOR.Term)
+  -> (forall vData. extra vData -> CBOR.Term -> Either Text vData)
+  -> Versions vNumber extra (MuxApplication InitiatorApp ptcl IO)
+  -- ^ application to run over the connection
+  -> Socket.Socket
+  -> IO ()
+connectTo' encodeData decodeData versions sd = do
+    bearer <- socketAsMuxBearer sd
+    Mx.muxBearerSetState bearer Mx.Connected
+    mapp <- runPeerWithByteLimit
+              maxTransmissionUnit
+              BL.length
+              nullTracer
+              codecHandshake
+              (Mx.muxBearerAsControlChannel bearer Mx.ModeInitiator)
+              (handshakeClientPeer encodeData decodeData versions)
+    case mapp of
+         Left err -> throwIO err
+         Right app -> do
+             Mx.muxBearerSetState bearer Mx.Mature
+             Mx.muxStart app bearer
 
 -- |
 -- A mux application which has a server component.
