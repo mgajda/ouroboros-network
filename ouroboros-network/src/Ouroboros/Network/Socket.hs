@@ -46,12 +46,11 @@ import qualified Network.Socket.ByteString.Lazy as Socket (recv, sendAll)
 
 import           Control.Tracer (nullTracer)
 
-import           Network.TypedProtocol.Driver
-
 import           Ouroboros.Network.Time
 import           Ouroboros.Network.Protocol.Handshake.Type
 import           Ouroboros.Network.Protocol.Handshake.Version
 import           Ouroboros.Network.Protocol.Handshake.Codec
+import           Ouroboros.Network.Driver
 
 import qualified Ouroboros.Network.Server.Socket as Server
 import qualified Ouroboros.Network.Mux as Mx

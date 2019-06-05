@@ -24,7 +24,6 @@ module Network.TypedProtocol.Driver (
 
   -- * Normal peers
   runPeer,
-  runPeerWithByteLimit,
   runPeerWith,
   TraceSendRecv(..),
 
@@ -38,14 +37,10 @@ module Network.TypedProtocol.Driver (
 
   -- * Driver utilities
   -- | This may be useful if you want to write your own driver.
-  ByteLimit (..),
-  DecoderFailureOrTooMuchInput (..),
   runDecoderWithChannel,
   ) where
 
 import Data.Void (Void)
-import Data.Int (Int64)
-import Data.Maybe (fromMaybe)
 
 import Network.TypedProtocol.Core
 import Network.TypedProtocol.Pipelined
@@ -171,24 +166,7 @@ runPeer
   -> Peer ps pr st m a
   -> m a
 
-runPeer tr codec channel = runPeerWith tr codec channel (\_stok -> runDecoderWithChannel Nothing)
-
--- |
--- Like @'runPeer'@, but require that each inbound message is smaller than
--- @limit@ bytes; if the limit is exceeded throw @'TooMuchInput'@ exception.
---
-runPeerWithByteLimit
-  :: forall ps (st :: ps) pr bytes failure m a .
-     (MonadThrow m, Exception failure)
-  => ByteLimit bytes
-  -> Tracer m (TraceSendRecv ps)
-  -> Codec ps failure m bytes
-  -> Channel m bytes
-  -> Peer ps pr st m a
-  -> m a
-
-runPeerWithByteLimit limit tr codec channel =
-  runPeerWith tr codec channel (\_stok -> runDecoderWithChannel (Just limit))
+runPeer tr codec channel = runPeerWith tr codec channel (\_stok -> runDecoderWithChannel)
 
 --
 -- Driver for pipelined peers
@@ -252,7 +230,7 @@ runPipelinedPeer
   -> m a
 
 runPipelinedPeer tr codec channel peer =
-    runPipelinedPeerWith tr codec channel (\_stok -> runDecoderWithChannel Nothing) peer
+    runPipelinedPeerWith tr codec channel (\_stok -> runDecoderWithChannel) peer
 
 
 data ReceiveHandler bytes ps pr m c where
@@ -449,45 +427,21 @@ data DecoderFailureOrTooMuchInput failure
   | TooMuchInput
   deriving (Show)
 
-instance Exception failure => Exception (DecoderFailureOrTooMuchInput failure)
-
-data ByteLimit bytes = ByteLimit {
-      byteLimit  :: !Int64,
-      byteLength :: !(bytes -> Int64)
-    }
-
 -- | Run a codec incremental decoder 'DecodeStep' against a channel. It also
 -- takes any extra input data and returns any unused trailing data.
 --
-runDecoderWithChannel
-    :: forall m bytes failure a. Monad m
-    => Maybe (ByteLimit bytes)
-    -> Channel m bytes
-    -> Maybe bytes
-    -> DecodeStep bytes failure m a
-    -> m (Either (DecoderFailureOrTooMuchInput failure) (a, Maybe bytes))
-runDecoderWithChannel limit Channel{recv} mbytes = go 0 mbytes
-    where
-      go :: Int64
-         -- ^ length of consumed input
-         -> Maybe bytes
-         -> DecodeStep bytes failure m a
-         -> m (Either (DecoderFailureOrTooMuchInput failure) (a, Maybe bytes))
-      -- we decoded the data, but we might be over the limit
-      go !l _  (DecodeDone x trailing) | Just ByteLimit {byteLimit, byteLength} <- limit
-                                       , (l - maybe 0 byteLength trailing) > byteLimit = return (Left TooMuchInput)
-                                       | otherwise                                     = return (Right (x, trailing))
-      -- we run over the limit, return @TooMuchInput@ error
-      go !l _  _                       | Just ByteLimit {byteLimit} <- limit
-                                       , l > byteLimit = return (Left TooMuchInput)
-      go !_ _  (DecodeFail failure)    = return (Left (DecoderFailure failure))
+runDecoderWithChannel :: Monad m
+                      => Channel m bytes
+                      -> Maybe bytes
+                      -> DecodeStep bytes failure m a
+                      -> m (Either failure (a, Maybe bytes))
 
-      go !l Nothing         (DecodePartial k) =
-        recv >>= (\mbs -> k mbs >>= go (l + (fromMaybe 0 (byteLength <$> limit <*> mbs))) Nothing)
-
-      go !l (Just trailing) (DecodePartial k) =
-        k (Just trailing) >>= go (l + (fromMaybe 0 (byteLength <$> limit <*> Just trailing))) Nothing
-
+runDecoderWithChannel Channel{recv} = go
+  where
+    go _ (DecodeDone x trailing) = return (Right (x, trailing))
+    go _ (DecodeFail failure)    = return (Left failure)
+    go Nothing         (DecodePartial k) = recv >>= k        >>= go Nothing
+    go (Just trailing) (DecodePartial k) = k (Just trailing) >>= go Nothing
 
 -- | Run two 'Peer's via a pair of connected 'Channel's and a common 'Codec'.
 --

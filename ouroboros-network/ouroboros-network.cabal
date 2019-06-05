@@ -50,6 +50,7 @@ library
                        Ouroboros.Network.Channel
                        Ouroboros.Network.Codec
                        Ouroboros.Network.DeltaQ
+                       Ouroboros.Network.Driver
                        Ouroboros.Network.Mux
                        Ouroboros.Network.Mux.Egress
                        Ouroboros.Network.Mux.Ingress
@@ -154,6 +155,7 @@ test-suite tests
                        Ouroboros.Network.ChainFragment
                        Ouroboros.Network.ChainProducerState
                        Ouroboros.Network.Channel
+                       Ouroboros.Network.Driver
                        Ouroboros.Network.Codec
                        Ouroboros.Network.DeltaQ
                        Ouroboros.Network.Mux
@@ -202,6 +204,7 @@ test-suite tests
                        Test.ChainGenerators
                        Test.ChainFragment
                        Test.ChainProducerState
+                       Test.Driver
                        Test.Ouroboros.Network.Testing.Utils
                        Test.Ouroboros.Network.BlockFetch
                        Test.Ouroboros.Network.Node
