@@ -58,7 +58,7 @@ tests = testGroup "Network.TypedProtocol.ReqResp"
   , testProperty "codec 3-splits"      (withMaxSuccess 33
                                        prop_codec_splits3_ReqResp)
 
-  , testProperty "runPeerWithuyteLimit ST"
+  , testProperty "runPeerWithByteLimit ST"
                                        prop_runPeerWithByteLimit_ST
   , testProperty "runPeerWithByteLimit IO"
                                        prop_runPeerWithByteLimit_IO
