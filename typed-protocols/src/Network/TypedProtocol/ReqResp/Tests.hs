@@ -11,6 +11,7 @@ module Network.TypedProtocol.ReqResp.Tests (tests) where
 
 import Network.TypedProtocol.Core
 import Network.TypedProtocol.Codec
+import Network.TypedProtocol.Pipelined
 import Network.TypedProtocol.Proofs
 import Network.TypedProtocol.Channel
 import Network.TypedProtocol.Driver
@@ -32,6 +33,7 @@ import Data.Int (Int64)
 import Data.Functor.Identity (Identity (..))
 import Data.Tuple (swap)
 import Data.List (mapAccumL)
+import Numeric.Natural (Natural)
 
 import Network.TypedProtocol.PingPong.Tests (splits2, splits3)
 
@@ -62,6 +64,10 @@ tests = testGroup "Network.TypedProtocol.ReqResp"
                                        prop_runPeerWithByteLimit_ST
   , testProperty "runPeerWithByteLimit IO"
                                        prop_runPeerWithByteLimit_IO
+  , testProperty "runPipelinedPeerWithByteLimit ST"
+                                       prop_runPipelinedPeerWithByteLimit_ST
+  , testProperty "runPipelinedPeerWithByteLimit IO"
+                                       prop_runPipelinedPeerWithByteLimit_IO
   ]
 
 
@@ -281,6 +287,66 @@ prop_runPeerWithByteLimit_IO
   -> Property
 prop_runPeerWithByteLimit_IO (ReqRespPayloadWithLimit limit payload) =
   ioProperty (prop_runPeerWithByteLimit limit [payload])
+
+
+-- |
+-- Run the client peer using @runPipelinedPeerWithByteLimit@, which will receive
+-- requests with the given payloads (the server echoes the requests to the
+-- client).
+--
+prop_runPipelinedPeerWithByteLimit
+  :: forall m. (MonadSTM m, MonadAsync m, MonadCatch m)
+  => Natural
+  -> Int64
+  -- ^ byte limit
+  -> [String]
+  -- ^ request payloads
+  -> m Bool
+prop_runPipelinedPeerWithByteLimit omax limit reqPayloads = do
+      (c1, c2) <- createConnectedChannels
+
+      res <- try $
+        runPeer nullTracer codecReqResp c1 recvPeer
+          `concurrently`
+        runPipelinedPeerWith omax nullTracer codecReqResp c2 (\_ -> runDecoderWithChannel (Just (ByteLimit limit (fromIntegral . length)))) sendPeer
+
+      case res :: Either (DecoderFailureOrTooMuchInput CodecFailure) ((), [String]) of
+        Right _           -> pure $ not shouldFail
+        Left TooMuchInput -> pure $ shouldFail
+        Left _            -> pure $ False
+ 
+    where
+      sendPeer :: PeerPipelined (ReqResp String String) AsClient StIdle m [String]
+      sendPeer = reqRespClientPeerPipelined $ reqRespClientMapPipelined reqPayloads
+
+      recvPeer :: Peer (ReqResp String String) AsServer StIdle m ()
+      recvPeer = reqRespServerPeer $ reqRespServerMapAccumL
+        (\acc req -> pure (acc, req))
+        ()
+
+      encoded :: [String]
+      encoded =
+        map (encode (codecReqResp @String @String @m) (ServerAgency TokBusy) . MsgResp) reqPayloads
+
+      shouldFail :: Bool
+      shouldFail = any (> limit) $ map (fromIntegral . length) encoded
+
+
+prop_runPipelinedPeerWithByteLimit_ST
+  :: Positive Int
+  -> ReqRespPayloadWithLimit
+  -> Bool
+prop_runPipelinedPeerWithByteLimit_ST (Positive omax) (ReqRespPayloadWithLimit limit payload) =
+      runSimOrThrow (prop_runPipelinedPeerWithByteLimit (fromIntegral omax) limit [payload])
+
+
+prop_runPipelinedPeerWithByteLimit_IO
+  :: Positive Int
+  -> ReqRespPayloadWithLimit
+  -> Property
+prop_runPipelinedPeerWithByteLimit_IO (Positive omax) (ReqRespPayloadWithLimit limit payload) =
+      ioProperty (prop_runPipelinedPeerWithByteLimit (fromIntegral omax) limit [payload])
+
 
 --
 -- Codec properties
