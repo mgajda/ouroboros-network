@@ -1,49 +1,62 @@
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Ouroboros.Network.Protocol.TxSubmission.Direct where
+module Ouroboros.Network.Protocol.TxSubmission.Direct (
+    directPipelined
+  ) where
 
-import           Network.TypedProtocol.Proofs
+import           Network.TypedProtocol.Pipelined
+import           Network.TypedProtocol.Proofs (Queue(..), enqueue)
 
 import           Ouroboros.Network.Protocol.TxSubmission.Client
 import           Ouroboros.Network.Protocol.TxSubmission.Server
 
 
-direct
-  :: forall hash tx m a b.
+directPipelined
+  :: forall txid tx m a b.
      Monad m
-  => TxSubmissionServerPipelined hash tx m a
-  -> TxSubmissionClient hash tx m b
+  => TxSubmissionServerPipelined txid tx m a
+  -> TxSubmissionClient          txid tx m b
   -> m (a, b)
-direct (TxSubmissionServerPipelined server) (TxSubmissionClient mclient) =
+directPipelined (TxSubmissionServerPipelined server)
+                (TxSubmissionClient mclient) =
     mclient >>= directSender EmptyQ server
   where
-    directSender :: Queue n (Either [hash] tx)
-                 -> TxSubmissionSender   hash tx n (Collection hash tx) m a
-                 -> TxSubmissionHandlers hash tx                        m b
+    directSender :: forall (n :: N).
+                    Queue        n (Collect txid tx)
+                 -> ServerStIdle n txid tx m a
+                 -> ClientStIdle   txid tx m b
                  -> m (a, b)
-    directSender q (SendMsgGetHashes n next) TxSubmissionHandlers {getHashes} = do
-      (hs, handlers) <- getHashes n
-      sender <- next hs
-      directSender q sender handlers
+    directSender q (SendMsgRequestTxIdsBlocking ackNo reqNo a serverNext)
+                   ClientStIdle{recvMsgRequestTxIds} = do
+      reply <- recvMsgRequestTxIds TokBlocking ackNo reqNo
+      case reply of
+        SendMsgReplyTxIds (BlockingReply txids) client' -> do
+          server' <- serverNext txids
+          directSender q server' client'
+        SendMsgDone b ->
+          return (a, b)
 
-    directSender q (SendMsgGetHashesPipelined n next) TxSubmissionHandlers {getHashes} = do
-      (hs, handlers) <- getHashes n
-      sender <- next
-      directSender (enqueue (Left hs) q) sender handlers
+    directSender q (SendMsgRequestTxIdsPipelined ackNo reqNo serverNext)
+                   ClientStIdle{recvMsgRequestTxIds} = do
+      reply <- recvMsgRequestTxIds TokNonBlocking ackNo reqNo
+      case reply of
+        SendMsgReplyTxIds (NonBlockingReply txids) client' -> do
+          server' <- serverNext
+          directSender (enqueue (CollectTxIds reqNo txids) q) server' client'
 
-    directSender q (SendMsgGetTx hash next) TxSubmissionHandlers {getTx} = do
-      (tx, handlers) <- getTx hash
-      sender <- next
-      directSender (enqueue (Right tx) q) sender handlers
+    directSender q (SendMsgRequestTxsPipelined txids serverNext)
+                   ClientStIdle{recvMsgRequestTxs} = do
+      server' <- serverNext
+      SendMsgReplyTxs txs client' <- recvMsgRequestTxs txids
+      directSender (enqueue (CollectTxs txids txs) q) server' client'
 
-    directSender q (CollectPipelined (Just next) _) handlers =
-      directSender q next handlers
+    directSender q (CollectPipelined (Just server') _) client =
+      directSender q server' client
 
-    directSender (ConsQ c q) (CollectPipelined _ collect) handlers = do
-      sender <- collect c
-      directSender q sender handlers
+    directSender (ConsQ c q) (CollectPipelined _ collect) client =
+      directSender q (collect c) client
 
-    directSender _ (SendMsgDone a) TxSubmissionHandlers {done = b} =
-      return (a, b)

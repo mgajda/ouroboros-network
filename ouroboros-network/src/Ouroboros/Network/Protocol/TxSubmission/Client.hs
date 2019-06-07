@@ -1,9 +1,34 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes          #-}
 
-module Ouroboros.Network.Protocol.TxSubmission.Client where
+
+-- | A view of the transaction submission protocol from the point of view of
+-- the client.
+--
+-- This provides a view that uses less complex types and should be easier to
+-- use than the underlying typed protocol itself.
+--
+-- For execution, 'txSubmissionClientPeer' is provided for conversion
+-- into the typed protocol.
+--
+module Ouroboros.Network.Protocol.TxSubmission.Client (
+    -- * Protocol type for the client
+    -- | The protocol states from the point of view of the client.
+    TxSubmissionClient(..)
+  , ClientStIdle(..)
+  , ClientStTxIds(..)
+  , ClientStTxs(..)
+  , TxSizeInBytes
+  , TokBlockingStyle(..)
+  , BlockingReplyList(..)
+
+    -- * Execution as a typed protocol
+  , txSubmissionClientPeer
+  ) where
 
 import           Data.Word (Word16)
 
@@ -12,50 +37,81 @@ import           Network.TypedProtocol.Core
 import           Ouroboros.Network.Protocol.TxSubmission.Type
 
 
--- |
--- Client side of the tx-submission protocol.
+-- | The client side of the transaction submission protocol.
 --
-newtype TxSubmissionClient hash tx m a = TxSubmissionClient {
-    runTxSubmissionClient :: m (TxSubmissionHandlers hash tx m a)
+-- The peer in the client role submits transactions to the peer in the server
+-- role.
+--
+newtype TxSubmissionClient txid tx m a = TxSubmissionClient {
+    runTxSubmissionClient :: m (ClientStIdle txid tx m a)
   }
 
-instance Functor m => Functor (TxSubmissionClient hash tx m) where
-  fmap f (TxSubmissionClient msender) = TxSubmissionClient ((fmap  . fmap) f msender)
-
--- |
--- (Recursive) handlers of the tx-submission client
+-- | In the 'StIdle' protocol state, the client does not have agency. Instead
+-- it is waiting for:
 --
-data TxSubmissionHandlers hash tx m a = TxSubmissionHandlers {
-    getHashes :: Word16 -> m ([hash], TxSubmissionHandlers hash tx m a),
-    getTx     :: hash    -> m (tx,     TxSubmissionHandlers hash tx m a),
-    done      :: a
+-- * a request for transaction ids (blocking or non-blocking)
+-- * a request for a given list of transactions
+-- * a termination message
+--
+-- It must be prepared to handle any of these.
+--
+data ClientStIdle txid tx m a = ClientStIdle {
+
+    recvMsgRequestTxIds      :: forall blocking.
+                                TokBlockingStyle blocking
+                             -> Word16
+                             -> Word16
+                             -> m (ClientStTxIds blocking txid tx m a),
+
+    recvMsgRequestTxs        :: [txid]
+                             -> m (ClientStTxs txid tx m a)
   }
 
-instance Functor m => Functor (TxSubmissionHandlers hash tx m) where
-  fmap f TxSubmissionHandlers {getHashes, getTx, done} = TxSubmissionHandlers {
-      getHashes = fmap (\(hs, next) -> (hs, fmap f next)) . getHashes,
-      getTx     = fmap (\(tx, next) -> (tx, fmap f next)) . getTx,
-      done      = f done
-    }
+data ClientStTxIds blocking txid tx m a where
+  SendMsgReplyTxIds :: BlockingReplyList blocking (txid, TxSizeInBytes)
+                    -> ClientStIdle           txid tx m a
+                    -> ClientStTxIds blocking txid tx m a
+
+  -- | In the blocking case, the client can terminate the protocol. This could
+  -- be used when the client knows there will be no more transactions to submit.
+  --
+  SendMsgDone       :: a -> ClientStTxIds StBlocking txid tx m a
 
 
--- |
--- A non-pipelined @'Peer'@ representing the @'TxSubmissionClient'@.
+data ClientStTxs txid tx m a where
+  SendMsgReplyTxs   :: [tx]
+                    -> ClientStIdle txid tx m a
+                    -> ClientStTxs  txid tx m a
+
+
+-- | A non-pipelined 'Peer' representing the 'TxSubmissionClient'.
 --
-txSubmissionClientPeer
-  :: forall hash tx m a. Monad m
-  => TxSubmissionClient hash tx m a
-  -> Peer (TxSubmission hash tx) AsClient StIdle m a
-txSubmissionClientPeer (TxSubmissionClient mclient) = Effect $ go <$> mclient
+txSubmissionClientPeer :: forall txid tx m a. Monad m
+                       => TxSubmissionClient txid tx m a
+                       -> Peer (TxSubmission txid tx) AsClient StIdle m a
+txSubmissionClientPeer (TxSubmissionClient client) =
+    Effect $ go <$> client
   where
-    go :: TxSubmissionHandlers hash tx m a
-       -> Peer (TxSubmission hash tx) AsClient StIdle m a
-    go TxSubmissionHandlers {getHashes, getTx, done} =
+    go :: ClientStIdle txid tx m a
+       -> Peer (TxSubmission txid tx) AsClient StIdle m a
+    go ClientStIdle {recvMsgRequestTxIds, recvMsgRequestTxs} =
       Await (ServerAgency TokIdle) $ \msg -> case msg of
-        MsgGetHashes n -> Effect $ do
-          (hs, next) <- getHashes n
-          return $ Yield (ClientAgency TokSendHashes) (MsgSendHashes hs) (go next)
-        MsgGetTx hash  -> Effect $ do
-          (tx, next) <- getTx hash
-          return $ Yield (ClientAgency TokSendTx) (MsgTx tx) (go next)
-        MsgDone        -> Done TokDone done
+        MsgRequestTxIds blocking ackNo reqNo -> Effect $ do
+          reply <- recvMsgRequestTxIds blocking ackNo reqNo
+          case reply of
+            SendMsgReplyTxIds txids k ->
+              return $ Yield (ClientAgency (TokTxIds blocking))
+                             (MsgReplyTxIds txids)
+                             (go k)
+
+            SendMsgDone result ->
+              return $ Yield (ClientAgency (TokTxIds TokBlocking))
+                              MsgDone
+                             (Done TokDone result)
+
+        MsgRequestTxs txids -> Effect $ do
+          SendMsgReplyTxs txs k <- recvMsgRequestTxs txids
+          return $ Yield (ClientAgency TokTxs)
+                         (MsgReplyTxs txs)
+                         (go k)
+

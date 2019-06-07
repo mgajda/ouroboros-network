@@ -1,265 +1,377 @@
+{-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving  #-}
 
-module Ouroboros.Network.Protocol.TxSubmission.Examples where
+module Ouroboros.Network.Protocol.TxSubmission.Examples (
+    txSubmissionClient,
+    txSubmissionServer,
 
-import           Data.List (find)
+    TraceEventClient(..),
+    TraceEventServer(..),
+  ) where
+
+import qualified Data.List.NonEmpty as NonEmpty
+import           Data.List.NonEmpty (NonEmpty(..))
 import           Data.Word (Word16)
+import qualified Data.Map.Strict as Map
+import           Data.Map.Strict (Map)
+import qualified Data.Sequence as Seq
+import           Data.Sequence (Seq)
+import           Data.Foldable (foldr, foldl')
 
-import           Network.TypedProtocol.Pipelined
+import           Control.Monad (when)
+import           Control.Exception (assert)
+import           Control.Tracer (Tracer, traceWith)
+
+import           Network.TypedProtocol.Pipelined (N, Nat(..))
 
 import           Ouroboros.Network.Protocol.TxSubmission.Client
 import           Ouroboros.Network.Protocol.TxSubmission.Server
 
 
--- |
--- An example @'TxSubmissionClient'@ which sends trasactions from a fixed pool
--- of transactions.  It returns a list of @tx@ sent back to the client.
 --
--- It is only ment to be used in test.  The client will error if a server will
--- ask for a transaction which is not in the pool or if a server will ask for
--- the same trasaction twice.
+-- Example client
 --
-txSubmissionClientFixed
-  :: forall hash tx m.
-     ( Applicative m
-     , Eq hash
-     )
-  => [tx]
-  -> (tx -> hash)
-  -> TxSubmissionClient hash tx m [tx]
-txSubmissionClientFixed txs0 txHash = TxSubmissionClient (pure $ handlers [] txs0)
-    where
-      handlers :: [tx] -> [tx] -> TxSubmissionHandlers hash tx m [tx]
-      handlers !sent txs =
-        TxSubmissionHandlers {
-          getHashes = \n -> 
-            let (resp, txs') = splitAt (fromIntegral n) txs
-            in pure (map txHash resp, handlers sent txs'),
-          getTx    = \hash -> case find (\tx -> txHash tx == hash) txs0 of
-                        Nothing -> error "no such transaction"
-                        Just tx -> pure (tx, handlers (tx:sent) txs),
-          done     = reverse sent
-        }
 
--- |
--- Auxilary data type which allows to collect requests and responses of
--- tx-submission protocol.
---
-data ReqOrResp hash tx
-  = ReqHashes Word16
-  | RespHashes [hash]
-  | ReqTx hash
-  | RespTx tx
-  deriving (Eq, Show)
+data TraceEventClient txid tx =
+     EventRecvMsgRequestTxIds (Seq txid) (Map txid tx) [tx] Word16 Word16
+   | EventRecvMsgRequestTxs   (Seq txid) (Map txid tx) [tx] [txid]
+  deriving Show
 
--- |
--- A non pipelined tx-submission server.  It send @'MsgGetHashes'@ awaits for
--- the response and then requests each transaction awaiting for it before
--- sending the next @'MsgGetTx'@ request.
+-- | An example @'TxSubmissionClient'@ which sends transactions from a fixed
+-- list of transactions.
 --
+-- It is intended to illustrate the protocol or for use in tests. The client
+-- enforces aspects of the protocol. It will fail with a protocol error if
+-- the peer asks for a transaction which is not in the unacknowledged set.
+-- The unacknowledged set is managed such that things are removed after having
+-- been requested. The net effect is that the peer can only ask for 
+-- * If a server will ask for
+-- the same transaction twice.
+--
+txSubmissionClient
+  :: forall txid tx m.
+     (Ord txid, Show txid, Monad m)
+  => Tracer m (TraceEventClient txid tx)
+  -> (tx -> txid)
+  -> (tx -> TxSizeInBytes)
+  -> Word16  -- ^ Maximum number of unacknowledged txids allowed
+  -> [tx]
+  -> TxSubmissionClient txid tx m ()
+txSubmissionClient tracer txId txSize maxUnacked =
+    TxSubmissionClient . pure . client Seq.empty Map.empty
+  where
+    client :: Seq txid -> Map txid tx -> [tx] -> ClientStIdle txid tx m ()
+    client !unackedSeq !unackedMap remainingTxs =
+        ClientStIdle { recvMsgRequestTxIds, recvMsgRequestTxs }
+      where
+        recvMsgRequestTxIds :: forall blocking.
+                               TokBlockingStyle blocking
+                            -> Word16
+                            -> Word16
+                            -> m (ClientStTxIds blocking txid tx m ())
+        recvMsgRequestTxIds blocking ackNo reqNo = do
+          traceWith tracer (EventRecvMsgRequestTxIds unackedSeq unackedMap
+                                                     remainingTxs ackNo reqNo)
+          when (ackNo > fromIntegral (Seq.length unackedSeq)) $
+            fail $ "txSubmissionClientConst.recvMsgRequestTxIds: "
+                ++ "peer acknowledged more txids than possible"
+
+          when (  fromIntegral (Seq.length unackedSeq)
+                - ackNo
+                + fromIntegral reqNo
+                > maxUnacked) $
+            fail $ "txSubmissionClientConst.recvMsgRequestTxIds: "
+                ++ "peer requested more txids than permitted"
+
+          let unackedSeq' = Seq.drop (fromIntegral ackNo) unackedSeq
+              unackedMap' = foldl' (flip Map.delete) unackedMap
+                                   (Seq.take (fromIntegral ackNo) unackedSeq)
+
+          case blocking of
+            TokBlocking | not (Seq.null unackedSeq')
+              -> fail $ "txSubmissionClientConst.recvMsgRequestTxIds: "
+                     ++ "peer made a blocking request for more txids when "
+                     ++ "there are still unacknowledged txids."
+            _ -> return ()
+
+          -- This example is eager, it always provides as many as asked for,
+          -- up to the number remaining available.
+          let unackedExtra   = take (fromIntegral reqNo) remainingTxs
+              unackedSeq''   = unackedSeq'
+                            <> Seq.fromList (map txId unackedExtra)
+              unackedMap''   = unackedMap'
+                            <> Map.fromList [ (txId tx, tx)
+                                            | tx <- unackedExtra ]
+              remainingTxs'  = drop (fromIntegral reqNo) remainingTxs
+              txIdAndSize tx = (txId tx, txSize tx)
+
+          return $! case (blocking, unackedExtra) of
+            (TokBlocking, []) ->
+              SendMsgDone ()
+
+            (TokBlocking, tx:txs) ->
+              SendMsgReplyTxIds
+                (BlockingReply (fmap txIdAndSize (tx :| txs)))
+                (client unackedSeq'' unackedMap'' remainingTxs')
+
+            (TokNonBlocking, txs) ->
+              SendMsgReplyTxIds
+                (NonBlockingReply (map txIdAndSize txs))
+                (client unackedSeq'' unackedMap'' remainingTxs')
+
+        recvMsgRequestTxs :: [txid]
+                          -> m (ClientStTxs txid tx m ())
+        recvMsgRequestTxs txids = do
+          traceWith tracer (EventRecvMsgRequestTxs unackedSeq unackedMap
+                                                   remainingTxs txids)
+          case [ txid | txid <- txids, txid `Map.notMember` unackedMap ] of
+            [] -> pure (SendMsgReplyTxs txs client')
+              where
+                txs         = map (unackedMap Map.!) txids
+                client'     = client unackedSeq unackedMap' remainingTxs
+                unackedMap' = foldr Map.delete unackedMap txids
+
+            missing -> fail $ "txSubmissionClientConst.recvMsgRequestTxs: "
+                           ++ "requested missing TxIds: " ++ show missing
+
+
+--
+-- Example server
+--
+
+data TraceEventServer txid tx =
+     EventRequestTxIdsBlocking  (ServerState txid tx) Word16 Word16
+   | EventRequestTxIdsPipelined (ServerState txid tx) Word16 Word16
+   | EventRequestTxsPipelined   (ServerState txid tx) [txid]
+
+deriving instance (Show txid, Show tx) => Show (TraceEventServer txid tx)
+
+data ServerState txid tx = ServerState {
+       -- | The number of transaction identifiers that we have requested but
+       -- which have not yet been replied to. We need to track this it keep
+       -- our requests within the limit on the number of unacknowledged txids.
+       --
+       requestedTxIdsInFlight :: Word16,
+
+       -- | Those transactions (by their identifier) that the client has told
+       -- us about, and which we have not yet acknowledged. This is kept in
+       -- the order in which the client gave them to us. This is the same order
+       -- in which we submit them to the mempool (or for this example, the final
+       -- result order). It is also the order we acknowledge in.
+       unacknowledgedTxIds :: Seq txid,
+
+       -- | Those transactions (by their identifier) that we can request. These
+       -- are a subset of the 'unacknowledgedTxIds' that we have not yet
+       -- requested. This is not ordered to illustrate the fact that we can
+       -- request txs out of order. We also remember 
+       availableTxids      :: Map txid TxSizeInBytes,
+
+--       txBytesInFlight     :: TxSizeInBytes,
+
+       -- | Transactions we have successfully downloaded but have not yet can
+       -- adding to the mempool or acknowledged. This needed because we request
+       -- transactions out of order but must use the original order when adding
+       -- to the mempool or acknowledging transactions.
+       --
+       bufferedTxs         :: Map txid (Maybe tx),
+
+       -- | The number of transactions we can acknowledge on our next request
+       -- for more transactions. The number here have already been removed from
+       -- 'unacknowledgedTxIds'.
+       --
+       numTxsToAcknowledge :: Word16
+     }
+  deriving Show
+
+initialServerState :: ServerState txid tx
+initialServerState = ServerState 0 Seq.empty Map.empty Map.empty 0
+
+
 txSubmissionServer
-  :: forall hash tx m.
-     Applicative m
-  => [Word16] -- ^ each element corresponds to a single @'MsgGetHashes'@ request
-  -> TxSubmissionServerPipelined hash tx m [ReqOrResp hash tx]
-txSubmissionServer ns0 = TxSubmissionServerPipelined (sender [] ns0)
-    where
-      sender
-        :: [ReqOrResp hash tx]
-        -> [Word16]
-        -> TxSubmissionSender hash tx Z (Collection hash tx) m [ReqOrResp hash tx]
-      sender txs []     = SendMsgDone (reverse txs)
-      sender txs (n:ns) = SendMsgGetHashes n
-                            $ \hs -> pure (getHashes (RespHashes hs:ReqHashes n:txs) ns hs)
+  :: forall txid tx m.
+     (Ord txid, Show txid, Show tx, Monad m)
+  => Tracer m (TraceEventServer txid tx)
+  -> (tx -> txid)
+  -> Word16  -- ^ Maximum number of unacknowledged txids  
+  -> Word16  -- ^ Maximum number of txids to request in any one go
+  -> Word16  -- ^ Maximum number of txs to request in any one go
+  -> TxSubmissionServerPipelined txid tx m [tx]
+txSubmissionServer tracer txId maxUnacked maxTxIdsToRequest maxTxToRequest =
+    TxSubmissionServerPipelined (serverIdle [] Zero initialServerState)
+  where
+    serverIdle :: forall (n :: N).
+                  [tx]
+               -> Nat n
+               -> ServerState txid tx
+               -> ServerStIdle n txid tx m [tx]
+    serverIdle accum Zero st
+        -- There are no replies in flight, but we do know some more txs we can
+        -- ask for, so lets ask for them and more txids.
+      | canRequestMoreTxs st
+      = serverReqTxs accum Zero st
 
-      getHashes
-        :: [ReqOrResp hash tx]
-        -> [Word16]
-        -> [hash]
-        -> TxSubmissionSender hash tx Z (Collection hash tx) m [ReqOrResp hash tx]
-      getHashes txs ns []     = sender txs ns
-      getHashes txs ns (h:hs) = SendMsgGetTx h
-                                  (pure $ CollectPipelined Nothing
-                                            $ \c -> case c of
-                                              Left _   -> pure $ getHashes txs      ns hs
-                                              Right tx -> pure $ getHashes (RespTx tx:ReqTx h:txs) ns hs )
+        -- There's no replies in flight, and we have no more txs we can ask for
+        -- so the only remaining thing to do is to ask for more txids. Since
+        -- this is the only thing to do now, we make this a blocking call.
+      | otherwise
+      , let numTxIdsToRequest = maxTxIdsToRequest `min` maxUnacked
+      = assert (requestedTxIdsInFlight st == 0
+             && Seq.null (unacknowledgedTxIds st)
+             && Map.null (availableTxids st)
+             && Map.null (bufferedTxs st)) $
+        SendMsgRequestTxIdsBlocking
+          (numTxsToAcknowledge st)
+          numTxIdsToRequest
+          accum                      -- result if the client reports we're done
+          (\txids -> do
+              traceWith tracer (EventRequestTxIdsBlocking st (numTxsToAcknowledge st) numTxIdsToRequest)
+              return . handleReply accum Zero st {
+                         numTxsToAcknowledge    = 0,
+                         requestedTxIdsInFlight = numTxIdsToRequest
+                       }
+                     . CollectTxIds numTxIdsToRequest
+                     . NonEmpty.toList $ txids)
 
--- |
--- A piplined tx-submission server that sends @'MsgGetTx'@ eagerly but always tries to
--- collect any replies as soon as they are available.  This keeps pipelining to
--- bare minimum, and gives maximum choice to the environment (drivers).
---
--- It returns the interleaving of requests and received trasactions.
---
-txSubmissionServerPipelinedMin
-  :: forall hash tx m.
-     Applicative m
-  => [Word16]
-  -> TxSubmissionServerPipelined hash tx m [ReqOrResp hash tx]
-txSubmissionServerPipelinedMin ns0 = TxSubmissionServerPipelined (sender [] ns0)
-    where
-      sender
-        :: [ReqOrResp hash tx]
-        -> [Word16]
-        -> TxSubmissionSender hash tx Z (Collection hash tx) m [ReqOrResp hash tx]
-      sender txs []     = SendMsgDone (reverse txs)
-      sender txs (n:ns) = SendMsgGetHashes n
-                            $ \hs -> pure (getHashes (RespHashes hs:ReqHashes n:txs) ns hs Zero)
+    serverIdle accum (Succ n) st
+        -- We have replies in flight and we should eagerly collect them if
+        -- available, but there are transactions to request too so we should
+        -- not block waiting for replies.
+        --
+        -- Having requested more transactions, we opportunistically ask for
+        -- more txids in a non-blocking way. This is how we pipeline asking for
+        -- both txs and txids.
+        --
+        -- It's important not to pipeline more requests for txids when we have
+        -- no txs to ask for, since (with no other guard) this will put us into
+        -- a busy-polling loop.
+        --
+      | canRequestMoreTxs st
+      = CollectPipelined
+          (Just (serverReqTxs accum (Succ n) st))
+          (handleReply accum n st)
 
-      getHashes
-        :: [ReqOrResp hash tx]
-        -> [Word16]
-        -> [hash]
-        -> Nat n
-        -> TxSubmissionSender hash tx n (Collection hash tx) m [ReqOrResp hash tx]
-      getHashes txs ns []         (Succ o) = CollectPipelined
-                                                Nothing
-                                                (\c -> case c of
-                                                  Left _   -> error "txSubmissionServerPipelinedMin"
-                                                  Right tx -> pure $ getHashes (RespTx tx:txs) ns [] o)
+        -- In this case there is nothing else to do so we block until we
+        -- collect a reply.
+      | otherwise
+      = CollectPipelined
+          Nothing
+          (handleReply accum n st)
 
-      getHashes txs ns hs@(h:hs') (Succ o) = CollectPipelined
-                                               (Just $ requestMoreTx txs ns h hs' (Succ o))
-                                               (\c -> case c of
-                                                 Left _   -> error "txSubmissionServerPiplinedMin"
-                                                 Right tx -> pure $ getHashes (RespTx tx:txs) ns hs o)
-      
-      getHashes txs ns (h:hs)     Zero     = requestMoreTx txs ns h hs Zero
+    canRequestMoreTxs :: ServerState k tx -> Bool
+    canRequestMoreTxs st =
+        not (Map.null (availableTxids st))
 
-      getHashes txs ns []         Zero     = sender txs ns
+    handleReply :: forall (n :: N).
+                   [tx]
+                -> Nat n
+                -> ServerState txid tx
+                -> Collect txid tx
+                -> ServerStIdle n txid tx m [tx]
+    handleReply accum n st (CollectTxIds reqNo txids) =
+      -- Upon receiving a batch of new txids we extend our available set,
+      -- and extended the unacknowledged sequence.
+      serverIdle accum n st {
+        requestedTxIdsInFlight = requestedTxIdsInFlight st - reqNo,
+        unacknowledgedTxIds    = unacknowledgedTxIds st
+                              <> Seq.fromList (map fst txids),
+        availableTxids         = availableTxids st
+                              <> Map.fromList txids
+      }
 
-      
-      requestMoreTx 
-        :: [ReqOrResp hash tx]
-        -> [Word16]
-        -> hash
-        -> [hash]
-        -> Nat n
-        -> TxSubmissionSender hash tx n (Collection hash tx) m [ReqOrResp hash tx]
-      requestMoreTx txs ns h hs o = SendMsgGetTx h (pure $ getHashes (ReqTx h:txs) ns hs (Succ o))
+    handleReply accum n st (CollectTxs txids txs) =
+      -- When we receive a batch of transactions, in general we get a subset of
+      -- those that we asked for, with the remainder now deemed unnecessary.
+      -- But we still have to acknowledge the txids we were given. This combined
+      -- with the fact that we request txs out of order means our bufferedTxs
+      -- has to track all the txids we asked for, even though not all have
+      -- replies.
+      --
+      -- We have to update the unacknowledgedTxIds here eagerly and not delay it
+      -- to serverReqTxs, otherwise we could end up blocking in serverIdle on
+      -- more pipelined results rather than being able to move on.
+      serverIdle accum' n st {
+        bufferedTxs         = bufferedTxs'',
+        unacknowledgedTxIds = unacknowledgedTxIds',
+        numTxsToAcknowledge = numTxsToAcknowledge st
+                            + fromIntegral (Seq.length acknowledgedTxIds)
+      }
+      where
+        txIdsRequestedWithTxsReceived :: [(txid, Maybe tx)]
+        txIdsRequestedWithTxsReceived =
+          [ (txid, mbTx)
+          | let txsMap :: Map txid tx
+                txsMap = Map.fromList [ (txId tx, tx) | tx <- txs ]
+          , txid <- txids
+          , let !mbTx = Map.lookup txid txsMap
+          ]
 
+        bufferedTxs'  = bufferedTxs st
+                     <> Map.fromList txIdsRequestedWithTxsReceived
 
--- |
--- An example tx-submission server which sends @'MsgGetHashes'@ awaits for the
--- response, and then piplines requests for each received hash.  The responses
--- are collected before next @'MsgGetHashes'@.
---
-txSubmissionServerPipelinedMax
-  :: forall hash tx m.
-     Applicative m
-  => [Word16] -- ^ each element corresponds to a single @'MsgGetHashes'@ request
-  -> TxSubmissionServerPipelined hash tx m [ReqOrResp hash tx]
-txSubmissionServerPipelinedMax ns0 = TxSubmissionServerPipelined (sender [] ns0)
-    where
-      sender
-        :: [ReqOrResp hash tx]
-        -> [Word16]
-        -> TxSubmissionSender hash tx Z (Collection hash tx) m [ReqOrResp hash tx]
-      sender txs []     = SendMsgDone (reverse txs)
-      sender txs (n:ns) = SendMsgGetHashes n 
-                            $ \hs -> pure (getHashes (RespHashes hs:ReqHashes n:txs) ns hs Zero)
+        -- Check if having received more txs we can now confirm any (in strict
+        -- order in the unacknowledgedTxIds sequence).
+        (acknowledgedTxIds, unacknowledgedTxIds') =
+          Seq.spanl (`Map.member` bufferedTxs') (unacknowledgedTxIds st)
 
-      getHashes
-        :: [ReqOrResp hash tx]
-        -> [Word16]
-        -> [hash]
-        -> Nat n
-        -> TxSubmissionSender hash tx n (Collection hash tx) m [ReqOrResp hash tx]
-      getHashes txs ns []     Zero     = sender txs ns
-      getHashes txs ns (h:hs) o        = SendMsgGetTx h (pure $ getHashes (ReqTx h:txs) ns hs (Succ o))
-      getHashes txs ns []     (Succ o) = CollectPipelined Nothing
-                                        (\c -> case c of
-                                          Left  _  -> pure $ getHashes txs             ns [] o
-                                          Right tx -> pure $ getHashes (RespTx tx:txs) ns [] o)
+        -- If so we can add the acknowledged txs to our accumulating result
+        accum' = accum
+              ++ foldr (\txid r -> maybe r (:r) (bufferedTxs' Map.! txid)) []
+                       acknowledgedTxIds
 
--- |
--- Like @'txSubmissionServerPipelinedMin'@ but it also pipelines @'MsgGetHashes'@.
--- We pipeline the request for more hashes whenever we already get half of the
--- transactions.
---
--- It returns the interleaving of requests and received trasactions.
---
-txSubmissionServerPipelinedAllMin
-  :: forall hash tx m.
-     ( Applicative m
-     , Eq hash
-     )
-  => [Word16]
-  -> TxSubmissionServerPipelined hash tx m [ReqOrResp hash tx]
-txSubmissionServerPipelinedAllMin ns0 = TxSubmissionServerPipelined (sender [] ns0)
-    where
-      middle :: [as] -> Maybe as
-      middle as = let l = length as
-                      i = l `div` 2
-                  in if i < l then Just (as !! i) else Nothing
-
-      sender
-        :: [ReqOrResp hash tx]
-        -> [Word16]
-        -> TxSubmissionSender hash tx Z (Collection hash tx) m [ReqOrResp hash tx]
-      sender txs []     = SendMsgDone (reverse txs)
-      sender txs (n:ns) = SendMsgGetHashes n
-                            $ \hs -> pure (getHashes (RespHashes hs:ReqHashes n:txs) ns hs (middle hs) Zero)
-
-      senderPipelined
-        :: [ReqOrResp hash tx]
-        -> [Word16]
-        -> [hash]
-        -> Nat n
-        -> TxSubmissionSender hash tx n (Collection hash tx) m [ReqOrResp hash tx]
-      senderPipelined txs (n:ns) hs o = SendMsgGetHashesPipelined n
-                                                         (pure $ getHashes (ReqHashes n:txs) ns hs Nothing (Succ o)) 
-
-      senderPipelined txs []     hs@(_:_) (o@Succ{}) = getHashes txs [] hs Nothing o
-
-      senderPipelined txs []     hs@(_:_) Zero       = getHashes txs [] hs Nothing Zero
-
-      senderPipelined txs []     []       Zero       = SendMsgDone (reverse txs)
-
-      senderPipelined _   []     []       Succ{}     = error "ups, impossible is possible!"
+        -- And remove acknowledged txs from our buffer
+        bufferedTxs'' = foldl' (flip Map.delete) bufferedTxs' acknowledgedTxIds
 
 
-      -- Eagerly collect responses; send @'MsgGetTx'@, after we reached the
-      -- marked hash, we pipeline @'MsgGetHashes'@ using @'senderPipelined'@
-      getHashes
-        :: [ReqOrResp hash tx]
-        -> [Word16]
-        -> [hash]
-        -> Maybe hash -- ^ hash at which we do @'senderPipelined'@
-        -> Nat n
-        -> TxSubmissionSender hash tx n (Collection hash tx) m [ReqOrResp hash tx]
-      getHashes txs ns (h:hs) hash o        | hash == Just h
-                                            = senderPipelined txs ns (h:hs) o
+    serverReqTxs :: forall (n :: N).
+                    [tx]
+                 -> Nat n
+                 -> ServerState txid tx
+                 -> ServerStIdle n txid tx m [tx]
+    serverReqTxs accum n st =
+        SendMsgRequestTxsPipelined
+          (Map.keys txsToRequest)
+          (do traceWith tracer (EventRequestTxsPipelined st (Map.keys txsToRequest))
+              pure $ serverReqTxIds accum (Succ n) st {
+                availableTxids = availableTxids'
+              })
+      where
+        -- This implementation is deliberately naive, we pick in an arbitrary
+        -- order and up to a fixed limit. The real thing should take account of
+        -- the expected transaction sizes, to pipeline well and keep within
+        -- pipelining byte limits.
+        (txsToRequest, availableTxids') =
+          Map.splitAt (fromIntegral maxTxToRequest) (availableTxids st)
 
-      getHashes txs ns []     hash (Succ o) = CollectPipelined
-                                                Nothing
-                                                (\c -> case c of
-                                                  Left hs  -> pure $ getHashes (RespHashes hs:txs) ns hs (middle hs) o
-                                                  Right tx -> pure $ getHashes (RespTx tx:txs) ns [] hash o)
+    serverReqTxIds :: forall (n :: N).
+                      [tx]
+                   -> Nat n
+                   -> ServerState txid tx
+                   -> ServerStIdle n txid tx m [tx]
+    serverReqTxIds accum n st
+      | numTxIdsToRequest > 0
+      = SendMsgRequestTxIdsPipelined
+          (numTxsToAcknowledge st)
+          numTxIdsToRequest
+          (do traceWith tracer (EventRequestTxIdsPipelined st (numTxsToAcknowledge st) numTxIdsToRequest)
+              pure $ serverIdle accum (Succ n) st {
+                requestedTxIdsInFlight = requestedTxIdsInFlight st
+                                       + numTxIdsToRequest,
+                numTxsToAcknowledge    = 0
+              })
 
-      getHashes txs ns (h:hs) hash (Succ o) = CollectPipelined
-                                                (Just $ requestMoreTx txs ns h hs hash (Succ o))
-                                                (\c -> case c of
-                                                  Left hs'  ->
-                                                    let hsNext = hs ++ hs'
-                                                    in pure $ getHashes (RespHashes hs:txs) ns hsNext (middle hsNext) o
-                                                  Right tx -> pure $ getHashes (RespTx tx:txs) ns hs hash o)
-      
-      getHashes txs ns (h:hs) hash Zero     = requestMoreTx txs ns h hs hash Zero
+      | otherwise
+      = serverIdle accum n st
+      where
+        -- This definition is justified by the fact that the
+        -- 'numTxsToAcknowledge' are not included in the 'unacknowledgedTxIds'.
+        numTxIdsToRequest =
+                (maxUnacked
+                  - fromIntegral (Seq.length (unacknowledgedTxIds st))
+                  - requestedTxIdsInFlight st)
+          `min` maxTxIdsToRequest
 
-      getHashes txs ns []     _    Zero     = sender txs ns
-
-      
-      requestMoreTx 
-        :: [ReqOrResp hash tx]
-        -> [Word16]
-        -> hash
-        -> [hash]
-        -> Maybe hash
-        -> Nat n
-        -> TxSubmissionSender hash tx n (Collection hash tx) m [ReqOrResp hash tx]
-      requestMoreTx txs ns h hs hash o = SendMsgGetTx h (pure $ getHashes (ReqTx h:txs) ns hs hash (Succ o))

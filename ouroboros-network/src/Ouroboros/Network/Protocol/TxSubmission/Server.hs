@@ -3,136 +3,141 @@
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Ouroboros.Network.Protocol.TxSubmission.Server
-  ( TxSubmissionServerPipelined (..)
-  , TxSubmissionSender (..)
-  , Collection
+-- | A view of the transaction submission protocol from the point of view of
+-- the server.
+--
+-- This provides a view that uses less complex types and should be easier to
+-- use than the underlying typed protocol itself.
+--
+-- For execution, a conversion into the typed protocol is provided.
+--
+module Ouroboros.Network.Protocol.TxSubmission.Server (
+    -- * Protocol type for the server
+    -- | The protocol states from the point of view of the server.
+    TxSubmissionServerPipelined (..)
+  , ServerStIdle(..)
+  , Collect(..)
+  , TxSizeInBytes
+
+    -- * Execution as a typed protocol
   , txSubmissionServerPeerPipelined
-  , txSubmissionSender
-  )
-  where
+  ) where
 
 import           Data.Word (Word16)
+import           Data.List.NonEmpty (NonEmpty)
 
 import           Network.TypedProtocol.Core
 import           Network.TypedProtocol.Pipelined
 
 import           Ouroboros.Network.Protocol.TxSubmission.Type
 
---
--- Pipelined server
---
 
--- | This type represents what @'PeerReceiver'@ will collect, since
--- tx-submission server can pipeline both @'SendMsgGetHash'@ and @'MsgGetTx'@
--- we need a sum of both @[hash]@ and @tx@ types.
---
-type Collection hash tx = Either [hash] tx
-
-data TxSubmissionServerPipelined hash tx m a where
+data TxSubmissionServerPipelined txid tx m a where
   TxSubmissionServerPipelined
-    :: TxSubmissionSender hash tx Z (Collection hash tx) m a
-    -> TxSubmissionServerPipelined hash tx m a
+    :: ServerStIdle              Z txid tx m a
+    -> TxSubmissionServerPipelined txid tx m a
 
--- |
--- @'TxSubmissionSender'@ can be transformed into a pipelined @'PeerSender'@.
--- We are only pipelining trasactions requests, e.g. @'MsgTx'@.
--- 
--- @c@ variable will be instantiated with @'Collect' hash tx@.
-data TxSubmissionSender hash tx (n :: N) c m a where
+
+-- | This is the type of the pipelined results, since this transaction
+-- submission can pipeline requests for transaction ids and transactions,
+-- so we use a sum of either.
+--
+data Collect txid tx =
+       -- | The result of 'SendMsgRequestTxIdsPipelined'. It also carries
+       -- the number of txids originally requested.
+       CollectTxIds Word16 [(txid, TxSizeInBytes)]
+
+       -- | The result of 'SendMsgRequestTxsPipelined'. The actual reply only
+       -- contains the transactions sent, but this pairs them up with the
+       -- transactions requested. This is because the peer can determine that
+       -- some transactions are no longer needed.
+     | CollectTxs [txid] [tx]
+
+
+data ServerStIdle (n :: N) txid tx m a where
 
   -- |
-  -- Ask the server for a list of transaction hashes by sending @'MsgGetHashes'@.
   --
-  SendMsgGetHashes
+  SendMsgRequestTxIdsBlocking
+    :: Word16                               -- ^ number of txids to acknowledge
+    -> Word16                               -- ^ number of txids to request
+    -> a                                    -- ^ Result if done
+    -> (NonEmpty (txid, TxSizeInBytes)
+        -> m (ServerStIdle Z txid tx m a))
+    -> ServerStIdle        Z txid tx m a
+
+  -- |
+  --
+  SendMsgRequestTxIdsPipelined
     :: Word16
-    -> ([hash] -> m (TxSubmissionSender hash tx n c m a))
-    -> TxSubmissionSender hash tx n c m a
+    -> Word16
+    -> m (ServerStIdle (S n) txid tx m a)
+    -> ServerStIdle       n  txid tx m a
 
   -- |
-  -- Piplined version of @'SendMsgGetHashes'@.
   --
-  SendMsgGetHashesPipelined
-    :: Word16
-    -> m (TxSubmissionSender hash tx (S n) c m a)
-    -> TxSubmissionSender hash tx    n c m a
+  SendMsgRequestTxsPipelined
+    :: [txid]
+    -> m (ServerStIdle (S n) txid tx m a)
+    -> ServerStIdle       n  txid tx m a
 
-  -- |
-  -- Possibly pipelined @'MsgGetTx'@..
-  --
-  SendMsgGetTx
-    :: hash
-    -> m (TxSubmissionSender hash tx (S n) c m a)
-    -> TxSubmissionSender hash tx    n  c m a
-
-  -- |
-  -- Collect pipelined responses, either @'MsgSendHashes'@ or @'MsgTx'@.
+  -- | Collect a pipelined result.
   --
   CollectPipelined
-    ::    Maybe (TxSubmissionSender hash tx (S n) c m a)
-    -> (c ->  m (TxSubmissionSender hash tx    n  c m a))
-    ->           TxSubmissionSender hash tx (S n) c m a
+    :: Maybe              (ServerStIdle (S n) txid tx m a)
+    -> (Collect txid tx -> ServerStIdle    n  txid tx m a) --TODO put in m
+    ->                     ServerStIdle (S n) txid tx m a
 
-  -- |
-  -- Terminate the tx-submission protocol.
-  --
-  SendMsgDone
-    :: a
-    -> TxSubmissionSender hash tx Z c m a
 
--- |
--- Transform a @'TxSubmissionServerPipelined'@ into a @'PeerPipelined'@ which
--- pipelines @'MsgGetTx'@ messages.
+-- | Transform a 'TxSubmissionServerPipelined' into a 'PeerPipelined'.
 --
 txSubmissionServerPeerPipelined
-    :: forall hash tx m a.
+    :: forall txid tx m a.
        Functor m
-    => TxSubmissionServerPipelined hash tx m a
-    -> PeerPipelined (TxSubmission hash tx) AsServer StIdle m a
-txSubmissionServerPeerPipelined (TxSubmissionServerPipelined sender) =
-  PeerPipelined $ txSubmissionSender sender
+    => TxSubmissionServerPipelined txid tx m a
+    -> PeerPipelined (TxSubmission txid tx) AsServer StIdle m a
+txSubmissionServerPeerPipelined (TxSubmissionServerPipelined server) =
+    PeerPipelined (go server)
+  where
+    go :: forall (n :: N).
+          ServerStIdle n txid tx m a
+       -> PeerSender (TxSubmission txid tx) AsServer StIdle
+                     n (Collect txid tx) m a
 
--- |
--- The @'PeerSender'@ which asks for available transaction hashes and pipelines
--- @'MsgGetTx'@s.
---
-txSubmissionSender
-    :: forall hash tx (n :: N) m a.
-       Functor m
-    => TxSubmissionSender hash tx n (Collection hash tx) m a
-    -> PeerSender (TxSubmission hash tx) AsServer StIdle n (Collection hash tx) m a
+    go (SendMsgRequestTxIdsBlocking ackNo reqNo kDone k) =
+      SenderYield
+        (ServerAgency TokIdle)
+        (MsgRequestTxIds TokBlocking ackNo reqNo) $
+      SenderAwait
+        (ClientAgency (TokTxIds TokBlocking)) $ \msg ->
+        case msg of
+          MsgDone ->
+            SenderDone TokDone kDone
 
-txSubmissionSender (SendMsgDone a) =
-    SenderYield (ServerAgency TokIdle) MsgDone (SenderDone TokDone a)
+          MsgReplyTxIds (BlockingReply txids) ->
+            SenderEffect (go <$> k txids)
 
-txSubmissionSender (SendMsgGetHashes n next) =
-    SenderPipeline
-      (ServerAgency TokIdle)
-      (MsgGetHashes n)
-      (ReceiverAwait (ClientAgency TokSendHashes) $ \msg -> case msg of
-         MsgSendHashes hs -> ReceiverDone (Left hs))
-      (SenderCollect Nothing
-        $ \c -> case c of
-            Left hs -> SenderEffect (txSubmissionSender <$> (next hs))
-            _       -> error "txSubmissionSender: impossible happend")
+    go (SendMsgRequestTxIdsPipelined ackNo reqNo k) =
+      SenderPipeline
+        (ServerAgency TokIdle)
+        (MsgRequestTxIds TokNonBlocking ackNo reqNo)
+        (ReceiverAwait (ClientAgency (TokTxIds TokNonBlocking)) $ \msg ->
+           case msg of
+             MsgReplyTxIds (NonBlockingReply txids) ->
+               ReceiverDone (CollectTxIds reqNo txids))
+        (SenderEffect (go <$> k))
 
-txSubmissionSender (SendMsgGetHashesPipelined n next) =
-    SenderPipeline
-      (ServerAgency TokIdle)
-      (MsgGetHashes n)
-      (ReceiverAwait (ClientAgency TokSendHashes) $ \msg -> case msg of
-        MsgSendHashes hs -> ReceiverDone (Left hs))
-      (SenderEffect $ txSubmissionSender <$> next)
+    go (SendMsgRequestTxsPipelined txids k) =
+      SenderPipeline
+        (ServerAgency TokIdle)
+        (MsgRequestTxs txids)
+        (ReceiverAwait (ClientAgency TokTxs) $ \msg ->
+           case msg of
+             MsgReplyTxs txs -> ReceiverDone (CollectTxs txids txs))
+        (SenderEffect (go <$> k))
 
-txSubmissionSender (SendMsgGetTx hash next) =
-    SenderPipeline
-      (ServerAgency TokIdle)
-      (MsgGetTx hash)
-      (ReceiverAwait (ClientAgency TokSendTx) $ \msg -> case msg of
-        MsgTx tx -> ReceiverDone (Right tx))
-      (SenderEffect $ txSubmissionSender <$> next)
+    go (CollectPipelined mNone collect) =
+      SenderCollect
+        (fmap go mNone)
+        (go . collect)
 
-txSubmissionSender (CollectPipelined next collect) =
-    SenderCollect
-      (txSubmissionSender <$> next)
-      (SenderEffect . fmap txSubmissionSender . collect)

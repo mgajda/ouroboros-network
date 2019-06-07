@@ -34,12 +34,12 @@ tests =
   , Test.ChainProducerState.tests
 
     -- protocols
-  , Ouroboros.Network.Protocol.ChainSync.Test.tests
-  , Ouroboros.Network.Protocol.BlockFetch.Test.tests
   , Ouroboros.Network.Protocol.PingPong.Test.tests
   , Ouroboros.Network.Protocol.ReqResp.Test.tests
-  , Ouroboros.Network.Protocol.Handshake.Test.tests
+  , Ouroboros.Network.Protocol.ChainSync.Test.tests
+  , Ouroboros.Network.Protocol.BlockFetch.Test.tests
   , Ouroboros.Network.Protocol.TxSubmission.Test.tests
+  , Ouroboros.Network.Protocol.Handshake.Test.tests
 
     -- network logic
   , Test.Mux.tests
