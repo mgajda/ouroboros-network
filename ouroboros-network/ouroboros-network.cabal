@@ -80,6 +80,10 @@ library
                        Ouroboros.Network.Protocol.TxSubmission.Client
                        Ouroboros.Network.Protocol.TxSubmission.Server
                        Ouroboros.Network.Protocol.TxSubmission.Codec
+                       Ouroboros.Network.Protocol.LocalTxSubmission.Type
+                       Ouroboros.Network.Protocol.LocalTxSubmission.Client
+                       Ouroboros.Network.Protocol.LocalTxSubmission.Server
+                       Ouroboros.Network.Protocol.LocalTxSubmission.Codec
   default-language:    Haskell2010
   other-extensions:    BangPatterns,
                        DataKinds,
@@ -193,6 +197,13 @@ test-suite tests
                        Ouroboros.Network.Protocol.TxSubmission.Server
                        Ouroboros.Network.Protocol.TxSubmission.Type
                        Ouroboros.Network.Protocol.TxSubmission.Test
+                       Ouroboros.Network.Protocol.LocalTxSubmission.Client
+                       Ouroboros.Network.Protocol.LocalTxSubmission.Codec
+                       Ouroboros.Network.Protocol.LocalTxSubmission.Direct
+                       Ouroboros.Network.Protocol.LocalTxSubmission.Examples
+                       Ouroboros.Network.Protocol.LocalTxSubmission.Server
+                       Ouroboros.Network.Protocol.LocalTxSubmission.Type
+                       Ouroboros.Network.Protocol.LocalTxSubmission.Test
                        Ouroboros.Network.Socket
                        Ouroboros.Network.Server.Socket
                        Ouroboros.Network.Time
