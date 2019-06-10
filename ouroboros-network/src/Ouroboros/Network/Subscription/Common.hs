@@ -5,6 +5,7 @@
 
 module Ouroboros.Network.Subscription.Common
     ( subscribeTo
+    , sockAddrFamily
     ) where
 
 import qualified Codec.CBOR.Term as CBOR

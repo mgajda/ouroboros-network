@@ -11,6 +11,7 @@ module Ouroboros.Network.Subscription.Dns
     , Resolver (..)
     , dnsSubscriptionWorker
     , dnsResolve
+    , resolutionDelay
     ) where
 
 import qualified Codec.CBOR.Term as CBOR
@@ -146,6 +147,7 @@ dnsResolve resolver (DnsSubscriptionTarget domain port _) = do
                  atomically $ writeTVar gotIpv6RspVar True
                  return $ Just e
              Right r -> do
+                 -- XXX Addresses should be sorted here based on DeltaQueue.
                  atomically $ putTMVar rspsVar $
                      map (\ip -> Socket.SockAddrInet6 (fromIntegral port) 0 (IP.toHostAddress6 ip) 0) r
                  atomically $ writeTVar gotIpv6RspVar True
@@ -171,6 +173,7 @@ dnsResolve resolver (DnsSubscriptionTarget domain port _) = do
                      if timeout || gotIpv6Rsp
                          then return ()
                          else retry
+                 -- XXX Addresses should be sorted here based on DeltaQueue.
                  atomically $ putTMVar rspsVar $
                      map (\ip -> Socket.SockAddrInet (fromIntegral port) (IP.toHostAddress ip)) r
                  return Nothing
