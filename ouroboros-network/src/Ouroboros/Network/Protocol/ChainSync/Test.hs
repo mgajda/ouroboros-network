@@ -78,7 +78,7 @@ testClient doneVar tip =
             return $ Left ()
           else return $ Right (testClient doneVar tip),
       ChainSyncExamples.rollforward = \block ->
-        if Chain.blockPoint block == tip
+        if Chain.Point (Chain.blockPoint block) == tip
           then do
             atomically $ writeTVar doneVar True
             return $ Left ()
@@ -139,7 +139,7 @@ propChainSyncConnectIO cps =
             void $  connect (chainSyncClientPeer cli) (chainSyncServerPeer ser)
         ) cps
 
-instance Arbitrary (AnyMessageAndAgency (ChainSync BlockHeader (Point BlockHeader))) where
+instance ( Arbitrary header, Arbitrary point ) => Arbitrary (AnyMessageAndAgency (ChainSync header point)) where
   arbitrary = oneof
     [ return $ AnyMessageAndAgency (ClientAgency TokIdle) MsgRequestNext
     , return $ AnyMessageAndAgency (ServerAgency (TokNext TokCanAwait)) MsgAwaitReply
