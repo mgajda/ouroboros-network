@@ -63,6 +63,7 @@ commonLib.pkgs.lib.mapAttrsRecursiveCond
   extraBuilds = {
     tests = default.tests;
     network-pdf = default.network-pdf;
+    ihaskell-notebook = default.ihaskell-notebook;
   };
   required-targets = jobs: [
     # targets are specified using above nomenclature:
