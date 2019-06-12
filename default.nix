@@ -1,4 +1,10 @@
-{ customConfig ? {}, ... }:
+{
+  customConfig ? {}
+, config ? {}
+, system ? builtins.currentSystem
+, iohkLib ? import ./nix/iohk-common.nix { inherit config system; }
+, pkgs ? iohkLib.pkgs
+}:
 #
 # The default.nix file. This will generate targets for all
 # buildables (see release.nix for nomenclature, excluding
@@ -50,8 +56,10 @@ let
   };
   tests = import ./nix/nixos/tests { inherit (commonLib) pkgs; };
   network-pdf = import ./doc/default.nix {inherit commonLib; };
+  ihaskell-notebook = import ./nix/ihaskell-notebook.nix {inherit commonLib; inherit nixTools;};
 in {
   inherit scripts tests;
   inherit (nixTools) nix-tools;
   inherit network-pdf;
+  inherit ihaskell-notebook;
 }
