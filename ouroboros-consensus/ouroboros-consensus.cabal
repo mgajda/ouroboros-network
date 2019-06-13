@@ -64,6 +64,7 @@ library
                        Ouroboros.Consensus.Protocol.Test
                        Ouroboros.Consensus.Protocol.ExtNodeConfig
                        Ouroboros.Consensus.Protocol.ModChainSel
+                       Ouroboros.Consensus.Update
                        Ouroboros.Consensus.Util
                        Ouroboros.Consensus.Util.AnchoredFragment
                        Ouroboros.Consensus.Util.CBOR
@@ -224,6 +225,14 @@ executable demo-playground
                        cardano-ledger-test,
                        cardano-prelude,
                        iohk-monitoring,
+
+                       cardano-binary,
+                       cardano-crypto-test,
+                       cardano-ledger,
+                       cardano-prelude-test,
+                       memory,
+                       primitive,
+                       time,
 
                        aeson,
                        async,

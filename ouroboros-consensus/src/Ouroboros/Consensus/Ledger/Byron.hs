@@ -27,6 +27,7 @@ import           Data.Bimap (Bimap)
 import qualified Data.Bimap as Bimap
 import qualified Data.ByteString.Lazy as Lazy
 import           Data.Coerce
+import           Data.Either (lefts, rights)
 import           Data.FingerTree (Measured (..))
 import           Data.Foldable (find)
 import           Data.List.NonEmpty (NonEmpty (..))
@@ -70,6 +71,7 @@ import           Ouroboros.Consensus.Node (CoreNodeId)
 import           Ouroboros.Consensus.Protocol.Abstract
 import           Ouroboros.Consensus.Protocol.ExtNodeConfig
 import           Ouroboros.Consensus.Protocol.PBFT
+import           Ouroboros.Consensus.Update
 import           Ouroboros.Consensus.Util.Condense
 
 import qualified Test.Cardano.Chain.Genesis.Dummy as Dummy
@@ -518,18 +520,63 @@ forgeByronDemoBlock
      , Given Crypto.ProtocolMagicId
      )
   => NodeConfig (ExtNodeConfig ByronDemoConfig (PBft PBftCardanoCrypto))
+  -> ExtLedgerState (ByronBlock ByronDemoConfig) -- ^ Extended ledger state
   -> SlotNo                                -- ^ Current slot
   -> BlockNo                               -- ^ Current block number
   -> ChainHash (ByronHeader cfg)           -- ^ Previous hash
   -> [ByronGenTx]                          -- ^ Txs to add in the block
+  -> [USSArgs]                             -- ^ Update system stimuli args
   -> ()                                    -- ^ Leader proof (IsLeader)
   -> m (ByronBlock ByronDemoConfig)
-forgeByronDemoBlock cfg curSlot curNo prevHash txs () = do
-    ouroborosPayload <- trace ("forging @ slot " <> show curSlot) $ mkPayload toCBOR cfg () preHeader
+forgeByronDemoBlock cfg els curSlot curNo prevHash txs ussargs () = do
+    ouroborosPayload <- trace ("forging @ slot " <> show curSlot <> ", ussargs: " <> show ussargs) $ mkPayload toCBOR cfg () preHeader
 --    traceM $ "Forge block: " ++ show (forgeBlock ouroborosPayload)
+    -- processUSStimuli ussa
+
     return $ forgeBlock ouroborosPayload
   where
-    ByronDemoConfig {..} = encNodeConfigExt cfg
+    ByronDemoConfig {..}               = encNodeConfigExt cfg
+    PBftNodeConfig {..}                = encNodeConfigP   cfg
+    ByronLedgerState {..}              = ledgerState els
+    CC.Block.ChainValidationState {..} = blsCurrent
+
+    usStimuli = promoteUSSArgs cvsUpdateState <$> ussargs
+    votes     = lefts usStimuli
+    mProposal = case rights usStimuli of
+                  []  -> Nothing
+                  [p] -> Just p
+                  _   -> error "XXX: unhandled -- multiple pending proposals for block."
+
+    completeProposalBody :: CC.UPI.State -> USSArgs -> CC.Update.ProposalBody
+    completeProposalBody state (ProposeSoftware (MProposalBody{softwareVersion=Just ver, metadata})) =
+      CC.Update.ProposalBody (CC.UPI.adoptedProtocolVersion state) emptyPPU ver metadata
+      -- XXX: export 'empty' in cardano-ledger
+      where emptyPPU = CC.Update.ProtocolParametersUpdate
+                       Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+                       Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+
+    completeProposalBody _ (ProposeProtocol (MProposalBody{protocolVersion=Just ver, protocolParametersUpdate=Just params})) =
+      CC.Update.ProposalBody ver params softVerMemptyish mempty
+      where softVerMemptyish =
+              CC.Update.SoftwareVersion (CC.Update.ApplicationName "") 0
+
+    completeProposalBody _ _ = error "Invariant failed: non-proposal in completeProposalBody."
+
+    safeSigner = Crypto.noPassSafeSigner key
+      where SignKeyCardanoDSIGN key = pbftSignKey
+
+    promoteUSSArgs :: CC.UPI.State -> USSArgs -> Either CC.Update.Vote CC.Update.Proposal
+    promoteUSSArgs _ (SubmitVote upid forAgainst) = Left $
+      CC.Update.mkVoteSafe
+      (Genesis.configProtocolMagicId (pbftGenesisConfig pbftParams))
+      safeSigner
+      upid
+      forAgainst
+    promoteUSSArgs state ussa = Right $
+      CC.Update.signProposal
+      (Genesis.configProtocolMagicId (pbftGenesisConfig pbftParams))
+      (completeProposalBody state ussa)
+      safeSigner
 
     txPayload :: CC.UTxO.TxPayload
     txPayload = CC.UTxO.mkTxPayload (map (fmap (const ()) . unByronTx) txs)
@@ -539,7 +586,7 @@ forgeByronDemoBlock cfg curSlot curNo prevHash txs () = do
           CC.Block.bodyTxPayload     = txPayload
         , CC.Block.bodySscPayload    = CC.Ssc.SscPayload
         , CC.Block.bodyDlgPayload    = Delegation.UnsafeAPayload [] ()
-        , CC.Block.bodyUpdatePayload = CC.Update.APayload Nothing [] ()
+        , CC.Block.bodyUpdatePayload = CC.Update.APayload mProposal votes ()
         }
 
     proof :: CC.Block.Proof

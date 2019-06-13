@@ -73,6 +73,7 @@ import           Ouroboros.Consensus.Protocol.ExtNodeConfig
 import           Ouroboros.Consensus.Protocol.LeaderSchedule
 import           Ouroboros.Consensus.Protocol.PBFT
 import           Ouroboros.Consensus.Protocol.Praos
+import           Ouroboros.Consensus.Update
 import           Ouroboros.Consensus.Util
 import           Ouroboros.Consensus.Util.Condense
 import           Ouroboros.Consensus.Util.HList (All, HList)
@@ -326,13 +327,15 @@ forgeSimpleBlock :: forall m p c.
                     , SupportedPreHeader p ~ Empty
                     )
                  => NodeConfig p
+                 -> ExtLedgerState (SimpleBlock p c) -- ^ Extended ledger state
                  -> SlotNo                          -- ^ Current slot
                  -> BlockNo                         -- ^ Current block number
                  -> ChainHash (SimpleHeader p c)    -- ^ Previous hash
                  -> [Tx]                            -- ^ Txs to add in the block
+                 -> [USSArgs]
                  -> IsLeader p
                  -> m (SimpleBlock p c)
-forgeSimpleBlock cfg curSlot curNo prevHash txs proof = do
+forgeSimpleBlock cfg _els curSlot curNo prevHash txs _ussa proof = do
     ouroborosPayload <- mkPayload encode cfg proof preHeader
     return $ SimpleBlock {
         simpleHeader = mkSimpleHeader preHeader ouroborosPayload

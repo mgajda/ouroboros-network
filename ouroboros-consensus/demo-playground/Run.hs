@@ -64,12 +64,19 @@ runNode cli@CLI{..} = do
     -- If the user asked to submit a transaction, we don't have to spin up a
     -- full node, we simply transmit it and exit.
     case command of
-      TxSubmitter topology tx ->
-        handleTxSubmission topology tx
       SimpleNode topology protocol -> do
         Some p <- fromProtocol protocol
         case runDemo p of
           Dict -> handleSimpleNode p cli topology
+      TxSubmitter topology tx ->
+        handleTxSubmission topology tx
+      ProtoProposer topology stim ->
+        handleUSSASubmission topology stim
+      SoftProposer  topology stim ->
+        handleUSSASubmission topology stim
+      Voter         topology stim ->
+        handleUSSASubmission topology stim
+
 -- Inlined byron-proxy/src/exec/Logging.hs:defaultLoggerConfig, so as to avoid
 -- introducing merge conflicts due to refactoring.  Should be factored after merges.
 -- | It's called `Representation` but is closely related to the `Configuration`
@@ -124,7 +131,7 @@ handleSimpleNode p CLI{..} (TopologyInfo myNodeId topologyFile) = do
       let callbacks :: NodeCallbacks IO (Block p)
           callbacks = NodeCallbacks {
               produceDRG   = drgNew
-            , produceBlock = \proof _l slot prevPoint prevBlockNo txs -> do
+            , produceBlock = \proof els slot prevPoint prevBlockNo txs ussArgs -> do
                 let curNo :: BlockNo
                     curNo = succ prevBlockNo
 
@@ -135,10 +142,12 @@ handleSimpleNode p CLI{..} (TopologyInfo myNodeId topologyFile) = do
                  -- to include all of them would be maximum block size, which
                  -- we ignore for now.
                 demoForgeBlock pInfoConfig
+                               els
                                slot
                                curNo
                                prevHash
                                txs
+                               ussArgs
                                proof
           }
 
@@ -178,6 +187,9 @@ handleSimpleNode p CLI{..} (TopologyInfo myNodeId topologyFile) = do
 
         -- Spawn the thread which listens to the mempool.
         mempoolThread <- spawnMempoolListener tracer myNodeId kernel
+
+        -- Spawn the update system stimulus listener
+        usThread      <- spawnUSSAListener    tracer myNodeId kernel
 
         forM_ (producers nodeSetup) (addUpstream'   pInfo kernel)
         forM_ (consumers nodeSetup) (addDownstream' pInfo kernel)

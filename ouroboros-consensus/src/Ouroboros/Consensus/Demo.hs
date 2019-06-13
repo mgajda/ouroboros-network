@@ -82,6 +82,7 @@ import           Ouroboros.Consensus.Protocol.ExtNodeConfig
 import           Ouroboros.Consensus.Protocol.LeaderSchedule
 import           Ouroboros.Consensus.Protocol.PBFT
 import           Ouroboros.Consensus.Protocol.Praos
+import           Ouroboros.Consensus.Update
 import           Ouroboros.Consensus.Util
 import           Ouroboros.Consensus.Util.Condense
 
@@ -434,19 +435,23 @@ class ( OuroborosTag p
 
   demoForgeBlock         :: (HasNodeState p m, MonadRandom m)
                          => NodeConfig p
+                         -> ExtLedgerState (Block p) -- ^ Current ledger state
                          -> SlotNo               -- ^ Current slot
                          -> BlockNo              -- ^ Current block number
                          -> ChainHash (Header p) -- ^ Previous hash
                          -> [GenTx (Block p)]    -- ^ Txs to add in the block
+                         -> [USSArgs]
                          -> IsLeader p
                          -> m (Block p)
   default demoForgeBlock :: IsSimple p
                          => (HasNodeState p m, MonadRandom m)
                          => NodeConfig p
+                         -> ExtLedgerState (Block p) -- ^ Current ledger state
                          -> SlotNo               -- ^ Current slot
                          -> BlockNo              -- ^ Current block number
                          -> ChainHash (Header p) -- ^ Previous hash
                          -> [GenTx (Block p)]    -- ^ Txs to add in the block
+                         -> [USSArgs]
                          -> IsLeader p
                          -> m (Block p)
 

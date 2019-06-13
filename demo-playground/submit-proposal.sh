@@ -5,8 +5,7 @@ now=`date "+%Y-%m-%d 00:00:00"`
 ptype=$1
 case ${ptype} in
         protocol | software ) ;;
-        * ) echo "Usage:  $0 ( protocol | software ) [PROPOSAL-OPTION..]" >&2; exit 1;;
-esac
+        * ) echo "Usage:  $0 ( protocol | software ) [PROPOSAL-OPTION..]" >&2; exit 1;; esac
 shift
 
 set -x
