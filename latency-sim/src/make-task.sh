@@ -1,0 +1,3 @@
+pandoc --from=markdown+tex_math_dollars+tex_math_double_backslash+pandoc_title_block --variable mainfont="DejaVu Serif" --variable sansfont=Arial --pdf-engine=xelatex task-spec-topo-discovery.md -o task-spec-topo-discovery.pdf
+pandoc --from=markdown+tex_math_dollars+tex_math_double_backslash+pandoc_title_block --variable mainfont="DejaVu Serif" --variable sansfont=Arial --pdf-engine=xelatex task-spec-topo-discovery.md --to rst+literate_haskell -o task-spec-topo-discovery.lhs
+pandoc --mathml --from=gfm+tex_math_dollars+yaml_metadata_block+pandoc_title_block --variable mainfont="DejaVu Serif" --variable sansfont=Arial --pdf-engine=xelatex task-spec-topo-discovery.md -o task-spec-topo-discovery.html --highlight-style=espresso
