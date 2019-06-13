@@ -194,7 +194,8 @@ spawnListener pipeSchema process tracer myNodeId kernel = do
         withNamedPipe pipeSchema myNodeId ReadWriteMode True $ \h -> do
             let getChunk = BS.hGetSome h 1024
             decoder <- initDecoderIO getChunk
-            process tracer kernel decoder
+            forever $
+              process tracer kernel decoder
 
 spawnMempoolListener
               :: RunDemo p
