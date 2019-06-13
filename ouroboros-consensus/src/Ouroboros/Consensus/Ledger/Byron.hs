@@ -41,6 +41,7 @@ import           Data.Typeable
 import qualified Data.Vector as V
 import           Data.Word
 import           Formatting
+import           Debug.Trace (trace)
 
 import           Cardano.Binary (Annotated (..), ByteSpan, fromCBOR, reAnnotate,
                      slice, toCBOR)
@@ -524,7 +525,7 @@ forgeByronDemoBlock
   -> ()                                    -- ^ Leader proof (IsLeader)
   -> m (ByronBlock ByronDemoConfig)
 forgeByronDemoBlock cfg curSlot curNo prevHash txs () = do
-    ouroborosPayload <- mkPayload toCBOR cfg () preHeader
+    ouroborosPayload <- trace ("forging @ slot " <> show curSlot) $ mkPayload toCBOR cfg () preHeader
 --    traceM $ "Forge block: " ++ show (forgeBlock ouroborosPayload)
     return $ forgeBlock ouroborosPayload
   where
