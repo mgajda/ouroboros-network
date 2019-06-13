@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -20,6 +21,7 @@ import           Data.Functor.Contravariant (contramap)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Semigroup ((<>))
+import qualified Data.Text as T
 
 import qualified Ouroboros.Network.AnchoredFragment as AF
 import           Ouroboros.Network.Block
@@ -43,6 +45,14 @@ import           Ouroboros.Storage.ChainDB (ChainDB)
 import qualified Ouroboros.Storage.ChainDB as ChainDB
 import qualified Ouroboros.Storage.ChainDB.Mock as ChainDB
 
+import qualified Cardano.BM.Configuration.Model as Monitoring (setupFromRepresentation)
+import qualified Cardano.BM.Data.BackendKind as Monitoring
+import qualified Cardano.BM.Data.Configuration as Monitoring (Representation (..), parseRepresentation)
+import qualified Cardano.BM.Data.Output as Monitoring
+import qualified Cardano.BM.Data.Severity as Monitoring
+import qualified Cardano.BM.Data.Tracer as Monitoring (toLogObject)
+import qualified Cardano.BM.Setup as Monitoring (withTrace)
+
 import           CLI
 import           Mock.TxSubmission
 import           NamedPipe (DataFlow (..), NodeMapping ((:==>:)))
@@ -60,6 +70,32 @@ runNode cli@CLI{..} = do
         Some p <- fromProtocol protocol
         case runDemo p of
           Dict -> handleSimpleNode p cli topology
+-- Inlined byron-proxy/src/exec/Logging.hs:defaultLoggerConfig, so as to avoid
+-- introducing merge conflicts due to refactoring.  Should be factored after merges.
+-- | It's called `Representation` but is closely related to the `Configuration`
+-- from iohk-monitoring. The latter has to do with `MVar`s. It's all very
+-- weird.
+defaultLoggerConfig :: Monitoring.Representation
+defaultLoggerConfig = Monitoring.Representation
+  { Monitoring.minSeverity     = Monitoring.Debug
+  , Monitoring.rotation        = Nothing
+  , Monitoring.setupScribes    = [stdoutScribe]
+  , Monitoring.defaultScribes  = [(Monitoring.StdoutSK, "stdout")]
+  , Monitoring.setupBackends   = [Monitoring.KatipBK]
+  , Monitoring.defaultBackends = [Monitoring.KatipBK]
+  , Monitoring.hasEKG          = Nothing
+  , Monitoring.hasPrometheus   = Nothing
+  , Monitoring.hasGUI          = Nothing
+  , Monitoring.options         = mempty
+  }
+  where
+  stdoutScribe = Monitoring.ScribeDefinition
+    { Monitoring.scKind     = Monitoring.StdoutSK
+    , Monitoring.scFormat   = Monitoring.ScText
+    , Monitoring.scName     = "stdout"
+    , Monitoring.scPrivacy  = Monitoring.ScPublic
+    , Monitoring.scRotation = Nothing
+    }
 
 -- | Sets up a simple node, which will run the chain sync protocol and block
 -- fetch protocol, and, if core, will also look at the mempool when trying to
@@ -110,33 +146,43 @@ handleSimpleNode p CLI{..} (TopologyInfo myNodeId topologyFile) = do
         (demoEncodePreHeader pInfoConfig) pInfoConfig pInfoInitLedger
         demoGetHeader
 
-      btime  <- realBlockchainTime registry slotDuration systemStart
-      let tracer = contramap ((show myNodeId <> " | ") <>) stdoutTracer
-          nodeParams = NodeParams
-            { encoder            = demoEncodePreHeader pInfoConfig
-            , tracer             = tracer
-            , threadRegistry     = registry
-            , maxClockSkew       = ClockSkew 1
-            , cfg                = pInfoConfig
-            , initState          = pInfoInitState
-            , btime
-            , chainDB
-            , callbacks
-            , blockFetchSize     = demoBlockFetchSize
-            , blockMatchesHeader = demoBlockMatchesHeader
-            }
+      -- Inlined (almost) byron-proxy/src/exec/Logging.hs:withLogging, so as to avoid
+      -- introducing merge conflicts due to refactoring.Should be factored after merges.
+      logConf <- case loggerConfig of
+        Nothing -> pure defaultLoggerConfig
+        Just fp -> Monitoring.parseRepresentation fp
+      loggerConfig' <- Monitoring.setupFromRepresentation $
+        logConf { Monitoring.minSeverity = loggerMinSev }
+      Monitoring.withTrace loggerConfig' (T.pack $ show myNodeId) $ \baseTracer -> do
 
-      kernel <- nodeKernel nodeParams
+        btime  <- realBlockchainTime registry slotDuration systemStart
+        let tracer = contramap ((show myNodeId <> " | ") <>)
+                               (Monitoring.toLogObject baseTracer)
+            nodeParams = NodeParams
+              { encoder            = demoEncodePreHeader pInfoConfig
+              , tracer             = tracer
+              , threadRegistry     = registry
+              , maxClockSkew       = ClockSkew 1
+              , cfg                = pInfoConfig
+              , initState          = pInfoInitState
+              , btime
+              , chainDB
+              , callbacks
+              , blockFetchSize     = demoBlockFetchSize
+              , blockMatchesHeader = demoBlockMatchesHeader
+              }
 
-      watchChain registry tracer chainDB
+        kernel <- nodeKernel nodeParams
 
-      -- Spawn the thread which listens to the mempool.
-      mempoolThread <- spawnMempoolListener tracer myNodeId kernel
+        watchChain registry tracer chainDB
 
-      forM_ (producers nodeSetup) (addUpstream'   pInfo kernel)
-      forM_ (consumers nodeSetup) (addDownstream' pInfo kernel)
+        -- Spawn the thread which listens to the mempool.
+        mempoolThread <- spawnMempoolListener tracer myNodeId kernel
 
-      Async.wait mempoolThread
+        forM_ (producers nodeSetup) (addUpstream'   pInfo kernel)
+        forM_ (consumers nodeSetup) (addDownstream' pInfo kernel)
+
+        Async.wait mempoolThread
   where
       nid :: Int
       nid = case myNodeId of
