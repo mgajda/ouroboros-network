@@ -30,6 +30,7 @@ import           Data.Coerce
 import           Data.Either (lefts, rights)
 import           Data.FingerTree (Measured (..))
 import           Data.Foldable (find)
+import           Data.Function ((&))
 import           Data.List.NonEmpty (NonEmpty (..))
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -541,10 +542,12 @@ forgeByronDemoBlock cfg els curSlot curNo prevHash txs ussargs () = do
     CC.Block.ChainValidationState {..} = blsCurrent
 
     usStimuli = promoteUSSArgs cvsUpdateState <$> ussargs
-    votes     = lefts usStimuli
+    votes     = lefts usStimuli & \xs->
+                                    if null xs then xs
+                                    else trace ("votes: " <> show votes) xs
     mProposal = case rights usStimuli of
                   []  -> Nothing
-                  [p] -> Just p
+                  [p] -> Just $ trace ("proposal: " <> show p) $ p
                   _   -> error "XXX: unhandled -- multiple pending proposals for block."
 
     completeProposalBody :: CC.UPI.State -> USSArgs -> CC.Update.ProposalBody
@@ -586,7 +589,7 @@ forgeByronDemoBlock cfg els curSlot curNo prevHash txs ussargs () = do
           CC.Block.bodyTxPayload     = txPayload
         , CC.Block.bodySscPayload    = CC.Ssc.SscPayload
         , CC.Block.bodyDlgPayload    = Delegation.UnsafeAPayload [] ()
-        , CC.Block.bodyUpdatePayload = CC.Update.APayload mProposal votes ()
+        , CC.Block.bodyUpdatePayload = trace "US payload" $ CC.Update.APayload mProposal votes ()
         }
 
     proof :: CC.Block.Proof
