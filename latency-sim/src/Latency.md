@@ -112,7 +112,7 @@ newtype Rate = Rate Probability
 newtype LatencyDistribution =
   LatencyDistribution {
     -- | Monotonically growing like any CDF. May not reach 1.
-  , prob :: Series Probability
+    prob :: Series Probability
   }
 cdf :: LatencyDistribution -> Series Probability
 cdf = cumsum . prob
@@ -186,9 +186,9 @@ in parallel: $$ΔQ(t)=ΔQ_1(t)\mathbf{;}ΔQ_2(t)$$.
       $$ΔQ(t)\mathbf{;}1_{\mathcal{Q}}=1_{\mathcal{Q}}\mathbf{;}ΔQ(t)=ΔQ(t)$$
 
 ```haskell
-rd1 `after` rd2 = RateDistribution {
-                    deadline = deadline   rd1      +     deadline   rd2
-                  , prob     = prob rd1 `convolve` prob rd2
+rd1 `after` rd2 = LatencyDistribution {
+                  --  deadline = deadline   rd1      +     deadline   rd2
+                    prob     = prob rd1 `convolve` prob rd2
                   }
 ```
 
@@ -206,18 +206,18 @@ $ΔQ(t)=ΔQ_1(t) ΔQ_2(t)$.
 Here is the Haskell code for naive definition of these two operations:
 We can also introduce alternative of two completion rates:
 ```haskell
-rd1 `whicheverIsFaster` rd2 = RateDistribution {
-    deadline = deadline   rd1 `max` deadline   rd2
-  , prob     = prob rd1 + prob rd2
-             - prob rd1 * prob rd2
+rd1 `whicheverIsFaster` rd2 = LatencyDistribution {
+  -- deadline = deadline   rd1 `max` deadline   rd2
+     prob     = prob rd1 + prob rd2
+              - prob rd1 * prob rd2
   }
 (∨) = whicheverIsFaster
 ```
 Now let's define neutral elements of both operations above:
 ```
-constantRate = RateDistribution {
-    deadline   = 0
-  , completion = Series [0]
+constantRate = LatencyDistribution {
+  -- deadline   = 0
+    completion = Series [0]
   }
 allLost = keptRate 0.0
 noDelay = keptRate 1.0
@@ -229,9 +229,9 @@ Here:
 3. Conjunction of two different actions simultaneously completed in parallel, and waits
 until they both are:
 ```
-rd1 `bothComplete` rd2 = RateDistribution {
-    deadline   = deadline   rd1 `max` deadline   rd2
-  , completion = prob rd1 * cdf2 + prob rd2 * cdf1 - prob rd1 * prob rd2
+rd1 `bothComplete` rd2 = LatencyDistribution {
+  -- deadline   = deadline   rd1 `max` deadline   rd2
+    completion = prob rd1 * cdf2 + prob rd2 * cdf1 - prob rd1 * prob rd2
   }
   where
     cdf1 = cumsum $ prob rd1
@@ -246,10 +246,10 @@ corresponding improper CDF of message arrival.
    and if it does not complete in this time, the other action is attempted:
 ```haskell
 failover deadline rdTry rdCatch =
-    RateDistribution {
-        deadline = deadline rdTry
-                 + deadline rdCatch
-      , prob     = initial <> fmap (remainder*) (prob rdCatch)
+    LatencyDistribution {
+      --  deadline = deadline rdTry
+      --           + deadline rdCatch
+        prob     = initial <> fmap (remainder*) (prob rdCatch)
     }
   where
     initial = prob rdTry `cut` deadline
@@ -284,15 +284,15 @@ failover deadline rdTry rdCatch =
    at least one terminal value of the ΔQ before
    looping.
 ```haskell
-mu :: RateDistribution → RateDistribution
+mu :: LatencyDistribution → LatencyDistribution
 mu = undefined
 ```
    For practical purposes we will rather use bounded iteration:
    $$μ_{n}X[Y].f(X)≡f^{n}(Y)$$.
    Which is $f$ iterated $n$ times, and applied to final value $Y$.
 ```haskell
-iterate :: (RateDistribution → RateDistribution)
-        →   RateDistribution → RateDistribution
+iterate :: (LatencyDistribution → LatencyDistribution)
+        →   LatencyDistribution → LatencyDistribution
 ```
 This operator seems elegant way of reasoning about infinite retransmission,
 where we treat finite description of process that has no bounds on the
@@ -396,7 +396,7 @@ We will need a standard library for treating these to speed up our computations.
 
 We can also define a mathematical ring of (rate, delay) pairs.
 
-Note that `RateDistribution` is a modulus over ring R with `after` as multiplication,
+Note that `LatencyDistribution` is a modulus over ring R with `after` as multiplication,
 and `whicheverIsFaster` as addition. Then `noDelay` is neutral element
 of multiplication (unit or one), and `bottom` is neutral element of addition.
 ^[This field definition will be used for multiplication of connection matrices.]
