@@ -47,7 +47,7 @@ This is similar to *arrival curve* considered in bounded latency networking
 Starting with description of its apparent properties, we identify
 their mathematical definitions, and ultimately arrive at algebra of ΔQ
 with basic operations that correspond to abstract interpretations
-of network miniprotocols[@NielsenNielsen].
+of network miniprotocols[@ProgramAnalysis].
 
 This allows us to use objects from single algebraic body to describe
 behaviour of entire protocols as improper CDFs.
@@ -163,7 +163,7 @@ scalar multiplications, special instances of the function,
 and properties for possible metric.
 _Altough metric is yet hard to intuitively define._
 
-We can define properties that natural ΔQ should satisfy:
+We can define properties that natural ΔQ in ICDF form should satisfy:
 ```
 prop_cdf_monotonic = undefined
 prop_cdf_deadline_is_nonnegative = undefined
@@ -433,6 +433,9 @@ Matrix multiplication follows uses $(\mathbf{;},∨)$-modulus.
 (So sequential composition in place of multiplication,
   and alternative selection in place of addition.)
 
+This series is called $A^{*}$ and that makes latency distribution class
+of metrics *transitive closure semirings* [@TransitiveClosureSemirings].
+
 Note that this series converges to $ΔQ$ on
 a single shortest path between each two nodes.
 That means that we may call this matrix $R_{min}(t)$,
@@ -555,27 +558,7 @@ than used by the algorithm.
 * expand the theory into capacity-limited networks
 * apply it to reason about latency of other protocols within Cardano
 
-# References
 
-[1] [Peer discovery design considerations](https://docs.google.com/document/d/17cVQoPTd70U7C1lPeHU8w3_C50TJhrVsCYTkPX9YE6I/edit)  [@PeerDiscovery]
-
-[2] [“Network Requirements” - Discussion. Prepared by Neil Davies and Peter Thompson , PNSol.Version 0.1 - 2017-10-10/13](https://input-output-rnd.slack.com/threads/convo/G930386BY-1554166072.004600/)
-
-[3] [Programming Satan's Computer](https://www.cl.cam.ac.uk/~rja14/Papers/satan.pdf) [@ProgrammingSatan]
-
-[5] [Homological Methods in Commutative Algebra. Raghavan, Balwant Singh, Sridharan](http://www.math.tifr.res.in/~publ/pamphlets/homological.pdf) [@HomologicalAlgebra]
-
-[6] [Homological Algebra on Wikipedia](https://en.wikipedia.org/wiki/Homological_algebra)
-
-[7] [Graph measures and network robustness. W. Ellens, R.E. Kooij](https://arxiv.org/pdf/1311.5064.pdf) [@NetworkRobustness]
-
-[8] [Effective resistance...](https://www.nas.ewi.tudelft.nl/people/Piet/papers/LAA_2011_EffectiveResistance.pdf) [@EffectiveGraphResistance]
-
-[9] [The network reliability problem and star semirings. Brent Yorgey. 2016-04-05](https://byorgey.wordpress.com/2016/04/05/the-network-reliability-problem-and-star-semirings/) [@NetworkReliabilityNotSemirings]
-
-[10] [A very general method of computing shortest paths](http://r6.ca/blog/20110808T035622Z.html) [@GeneralMethodOfShortestPaths]
-
-[11] [Transitive closure and related semiring properties via eliminants](https://geomete.com/abdali/papers/TCviaElim.pdf) [@TransitiveClosureSemirings]
 
 # Acknowledgments
 
@@ -651,3 +634,25 @@ instance Semigroup (Series a) where
 ```
 
 # References
+
+[1] [Peer discovery design considerations](https://docs.google.com/document/d/17cVQoPTd70U7C1lPeHU8w3_C50TJhrVsCYTkPX9YE6I/edit)  [@PeerDiscovery]
+
+[2] [“Network Requirements” - Discussion. Prepared by Neil Davies and Peter Thompson , PNSol.Version 0.1 - 2017-10-10/13](https://input-output-rnd.slack.com/threads/convo/G930386BY-1554166072.004600/)
+
+[3] [Programming Satan's Computer](https://www.cl.cam.ac.uk/~rja14/Papers/satan.pdf) [@ProgrammingSatan]
+
+[5] [Homological Methods in Commutative Algebra. Raghavan, Balwant Singh, Sridharan](http://www.math.tifr.res.in/~publ/pamphlets/homological.pdf) [@HomologicalAlgebra]
+
+[6] [Homological Algebra on Wikipedia](https://en.wikipedia.org/wiki/Homological_algebra)
+
+[7] [Graph measures and network robustness. W. Ellens, R.E. Kooij](https://arxiv.org/pdf/1311.5064.pdf) [@NetworkRobustness]
+
+[8] [Effective resistance...](https://www.nas.ewi.tudelft.nl/people/Piet/papers/LAA_2011_EffectiveResistance.pdf) [@EffectiveGraphResistance]
+
+[9] [The network reliability problem and star semirings. Brent Yorgey. 2016-04-05](https://byorgey.wordpress.com/2016/04/05/the-network-reliability-problem-and-star-semirings/) [@NetworkReliabilityNotSemirings]
+
+[10] [A very general method of computing shortest paths](http://r6.ca/blog/20110808T035622Z.html) [@GeneralMethodOfShortestPaths]
+
+[11] [Transitive closure and related semiring properties via eliminants](https://geomete.com/abdali/papers/TCviaElim.pdf) [@TransitiveClosureSemirings]
+
+# Bibliography
