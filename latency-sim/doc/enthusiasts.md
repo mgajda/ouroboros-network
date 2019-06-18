@@ -37,7 +37,7 @@ import Data.Semigroup
 # Introduction
 
 In order to accurately simulate capacity-insensitive network miniprotocols,
-we formally define network latency distribution as improper CDF
+we formally define network latency as ΔQ(t) improper CDF
 (cumulative distribution function) of arrived messages over time.
 We call it improper CDF, because it does not end at 100%,
 since some messages can be lost.
@@ -47,7 +47,7 @@ This is similar to *arrival curve* considered in bounded latency networking
 Starting with description of its apparent properties, we identify
 their mathematical definitions, and ultimately arrive at algebra of ΔQ
 with basic operations that correspond to abstract interpretations
-of network miniprotocols[@NielsenNielsen].
+of network miniprotocols[NielsenNielsen].
 
 This allows us to use objects from single algebraic body to describe
 behaviour of entire protocols as improper CDFs.
@@ -106,15 +106,17 @@ Below is Haskell specification of this datatype:
 ```{.haskell .literate}
 
 type Probability = Double -- between 0.0 and 1.0
-newtype Delay = Delay Int
+newtype Delay = Delay NominalDiffTime
 newtype Rate = Rate Probability
 
-newtype LatencyDistribution =
-  LatencyDistribution {
+data RateDistribution =
+  RateDistribution {
+    -- | Deadline after which we drop messages (or ignore them).
+    deadline   :: Delay
     -- | Monotonically growing like any CDF. May not reach 1.
   , prob :: Series Probability
   }
-cdf :: LatencyDistribution -> Series Probability
+cdf :: RateDistribution -> Series Probability
 cdf = cumsum . prob
 start = 0
 ```
@@ -320,32 +322,6 @@ since delay-free loss $loss(x)$ is measurable worsening of the metric,
 even though there is only one value of $t=0$ over which to integrate.
 ^[And as Doron Zeilberger mentions, continuous analysis is only a special case
   of discrete.[@Zeilberger]]
-
-## Estimates
-Note that we can define derived estimates of
-`LatencyDistribution`
-that somewhat approximate it:
-```
-newtype Deadline = Deadline Delay
-deadline :: LatencyDistribution -> Deadline
-deadline  = length . prob
-
-newtype Earliest = Earliest Delay
-earliest :: LatencyDistribution -> Earliest
-earliest  = length . takeWhile (0==) . prob
-```
-These estimates have the property that we can easily compute
-the same operations on estimates, without really computing
-the full `LatencyDistribution`.
-
-```
-class QualityEstimate e where
-  firstToFinish :: e -> e -> e
-  lastToFinish  :: e -> e -> e
-  andThen       :: e -> e -> e
-  -- | Add explicit case/if to make correct estimate
-  --   single pass instead of trace
-```
 
 # Representing networks
 
