@@ -52,8 +52,17 @@ of network miniprotocols[@ProgramAnalysis].
 This allows us to use objects from single algebraic body to describe
 behaviour of entire protocols as improper CDFs.
 
+
+## Related work
+Our goal here is to establish realm of reasonable performance metrics for
+Peer Discovery and similar miniprotocols of Cardano settlement layer
+[@PeerDiscovery].
+
 Then we discuss expansion of the concept to get most sensitive metrics
-of protocol and network robustness.
+of protocol and network robustness[@NetworkRobustness].
+However instead of heuristic measure like effective graph resistance
+[@EffectiveGraphResistance], we use logically justified measure derived
+from the actual behaviour of the network.
 
 This is similar to *network calculus* but uses simpler methods
 and uses more logical description with improper latency distribution functions,
@@ -428,7 +437,7 @@ algorithms executed on network matrices:
 
 1. If series $R(A)=\Sigma{}_{n} A+A^2+...+A^n$ converges to matrix of non-zero
 (non-`allLost`) values *in all cells* in a finite number of steps, we consider graph to be
-*strongly connected*.
+*strongly connected* [@GeneralMethodOfShortestPaths].
 Matrix multiplication follows uses $(\mathbf{;},∨)$-modulus.
 (So sequential composition in place of multiplication,
   and alternative selection in place of addition.)
@@ -436,7 +445,10 @@ Matrix multiplication follows uses $(\mathbf{;},∨)$-modulus.
 This series is called $A^{*}$ and that makes latency distribution class
 of metrics *transitive closure semirings* [@TransitiveClosureSemirings].
 
-Note that this series converges to $ΔQ$ on
+Note that making latency distributions a proper semiring requires appropriate
+definition of $\delta{}Q$ [@NetworkReliabilityNotSemirings]
+
+Also note that this series converges to $ΔQ$ on
 a single shortest path between each two nodes.
 That means that we may call this matrix $R_{min}(t)$,
 or optimal diffusion matrix.
@@ -633,9 +645,7 @@ instance Semigroup (Series a) where
   Series a <> Series b = Series (a <> b)
 ```
 
-# References
-
-[1] [Peer discovery design considerations](https://docs.google.com/document/d/17cVQoPTd70U7C1lPeHU8w3_C50TJhrVsCYTkPX9YE6I/edit)  [@PeerDiscovery]
+# References not yet added to bibliography
 
 [2] [“Network Requirements” - Discussion. Prepared by Neil Davies and Peter Thompson , PNSol.Version 0.1 - 2017-10-10/13](https://input-output-rnd.slack.com/threads/convo/G930386BY-1554166072.004600/)
 
@@ -645,14 +655,6 @@ instance Semigroup (Series a) where
 
 [6] [Homological Algebra on Wikipedia](https://en.wikipedia.org/wiki/Homological_algebra)
 
-[7] [Graph measures and network robustness. W. Ellens, R.E. Kooij](https://arxiv.org/pdf/1311.5064.pdf) [@NetworkRobustness]
 
-[8] [Effective resistance...](https://www.nas.ewi.tudelft.nl/people/Piet/papers/LAA_2011_EffectiveResistance.pdf) [@EffectiveGraphResistance]
-
-[9] [The network reliability problem and star semirings. Brent Yorgey. 2016-04-05](https://byorgey.wordpress.com/2016/04/05/the-network-reliability-problem-and-star-semirings/) [@NetworkReliabilityNotSemirings]
-
-[10] [A very general method of computing shortest paths](http://r6.ca/blog/20110808T035622Z.html) [@GeneralMethodOfShortestPaths]
-
-[11] [Transitive closure and related semiring properties via eliminants](https://geomete.com/abdali/papers/TCviaElim.pdf) [@TransitiveClosureSemirings]
 
 # Bibliography
