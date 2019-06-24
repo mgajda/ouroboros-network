@@ -36,7 +36,7 @@ with plt.xkcd():
     ax.set_ylim(0, 1.1)
     ax.set_xlim(0, last-first+0.5)
     plt.xlabel('delay $t$')
-    plt.ylabel('rate of messages arrived $ΔQ$')
+    plt.ylabel('Probability of message arriving by $t$')
     plt.title('Connection quality')
     fig.subplots_adjust(bottom=0.2)
     plt.savefig('completion-rate.png')
