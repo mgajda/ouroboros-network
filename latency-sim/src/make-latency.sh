@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NAME=Latency
-FORMAT=markdown+tex_math_dollars+yaml_metadata_block
+FORMAT=markdown+tex_math_dollars+yaml_metadata_block+citations
 
 echo "Linking diagrams"
 ln -s ../doc/completion-rate.png .
@@ -12,11 +12,11 @@ echo "Making hide-codeblocks filter"
 stack install # for `hide-codeblocks`
 
 echo "Making TEX"
-pandoc --filter=hide-codeblocks --natbib --from=${FORMAT} --standalone --variable mainfont="DejaVu Serif" --variable sansfont=Arial --to=latex --pdf-engine=xelatex ${NAME}.md -o ${NAME}.tex
+pandoc --filter=pandoc-citeproc --filter=hide-codeblocks --natbib --from=${FORMAT} --standalone --variable mainfont="DejaVu Serif" --variable sansfont=Arial --to=latex --pdf-engine=xelatex ${NAME}.md -o ${NAME}.tex --csl="chicago-fullnote-bibliography.csl" --bibliography=Latency.bib
 #--filter=pandoc-citeproc --biblio=Latency.bib
 
 echo "Making PDF"
-pandoc --filter=hide-codeblocks --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont=Arial --pdf-engine=xelatex ${NAME}.md -o ${NAME}.pdf
+pandoc --filter=hide-codeblocks --filter=pandoc-citeproc          --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont=Arial --pdf-engine=xelatex ${NAME}.md -o ${NAME}.pdf
 
 echo "Linking .lhs"
 #pandoc --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont=Arial --pdf-engine=xelatex ${NAME}.md --to rst+literate_haskell -o ${NAME}.lhs

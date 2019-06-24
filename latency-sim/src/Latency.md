@@ -1,16 +1,14 @@
 ---
 author:
   - Michał J. Gajda
-  - Peter     Thompson
-  - Neil      Davies
   - Karl      Knutsson
   - Duncan    Coutts
   - Marcin    Szamotulski
 title: Curious properties of latency distributions
 abstract: |
   Network latency distributions, their algebra, and use examples.
-date: June 12 2019, v1.8
-input: markdown+tex_math_dollars+yaml_metadata_block
+date: June 25 2019, v1.9
+input: markdown+tex_math_dollars+yaml_metadata_block+citations
 output:
   pdf_document:
     keep_tex: true
@@ -36,13 +34,12 @@ import Data.Semigroup
 
 # Introduction
 
-In order to accurately simulate capacity-insensitive network miniprotocols,
+In order to accurately simulate capacity-insensitive network miniprotocols
+[@cardanoNetworkRequirements],
 we formally define network latency distribution as improper CDF
 (cumulative distribution function) of arrived messages over time.
 We call it improper CDF, because it does not end at 100%,
 since some messages can be lost.
-This is similar to *arrival curve* considered in bounded latency networking
-[@latencyBounds].
 
 Starting with description of its apparent properties, we identify
 their mathematical definitions, and ultimately arrive at algebra of ΔQ
@@ -79,7 +76,8 @@ to approximate latency distribution assuming the same loss profile of packets.
 
 To define our key object, lets imagine a single network connection.
 In this document, we ignore capacity-related issues, so $∆Q(t)$ is simply
-*improper cumulative distribution function* of events arriving over time:
+*improper cumulative distribution function* of event arriving at some point
+of time:
 
 <center>
 
@@ -99,24 +97,25 @@ at all within desired time $t$, and we silently drop those that arrive later.
 For each distribution, we will define *deadline* formally
 as $d(t)=\text{maxarg}_{t}(ΔQ(t))$ or such $t$ for which our improper CDF reaches
 maximum value.
-We also define *ultimate arrival rate* formally as $a_{u}(ΔQ)=\max(ΔQ)$.
+We also define *ultimate arrival probability* formally as $a_{u}(ΔQ)=\max(ΔQ)$.
 Our improper CDFs are assumed to be always defined within finite subrange
-of delays, starting at $0$.
+of delays, starting at $0$. Ultimate arrival probability allows us
+to compare attenuation between two links.
 
-In the following we define domain of *arrival rates* as $\mathcal{A}$,
-which is probability, tagged as arrival rate.
+In the following we define domain of *arrival probabilities* as
+$\mathcal{A}\in[0,1.0]$, which is probability.
 
 We also define domain of *time* or *delays* as $\mathcal{T}$.
 We also call a domain of $ΔQ$ functions as
 $\mathcal{Q}=\mathcal{T}×(\mathcal{T}\rightarrow{}\mathcal{A})$
-^[Pair of deadline, and function from time to arrival rate.].
+^[Pair of deadline, and function from time to arrival probability
+  at any given delay.].
 
 Below is Haskell specification of this datatype:
 ```{.haskell .literate}
 
 type Probability = Double -- between 0.0 and 1.0
 newtype Delay = Delay Int
-newtype Rate = Rate Probability
 
 newtype LatencyDistribution =
   LatencyDistribution {
@@ -136,7 +135,7 @@ We now assume that we have a quality metric $|ΔQ|$, and enumerate properties
 it should intuitively exhibit:
 
 1. When shape of our improper CDF function stays the same,
-   but arrival rate uniformly
+   but arrival probability uniformly
    *drops* by factor $a∈\mathcal{A}$,
    then our quality metric should proportionately drop: $a*|ΔQ(t)|=|a*ΔQ(t)|$.
    (This is a *scalar multiplication* over our domain $\mathcal{Q}$.)
@@ -213,7 +212,9 @@ $ΔQ(t)=ΔQ_1(t) ΔQ_2(t)$.
   $$ΔQ(t) ∨ 0_{\mathcal{Q}}=0_{\mathcal{Q}}∨ΔQ(t)=ΔQ(t)$$
 
 Here is the Haskell code for naive definition of these two operations:
-We can also introduce alternative of two completion rates:
+We can also introduce alternative of two completion distributions.
+It corresponds to a an event that is earliest possible conclusion of one
+of two alternative events:
 ```haskell
 rd1 `whicheverIsFaster` rd2 = LatencyDistribution {
   -- deadline = deadline   rd1 `max` deadline   rd2
@@ -224,12 +225,11 @@ rd1 `whicheverIsFaster` rd2 = LatencyDistribution {
 ```
 Now let's define neutral elements of both operations above:
 ```
-constantRate = LatencyDistribution {
-  -- deadline   = 0
-    completion = Series [0]
+attenuated a = LatencyDistribution {
+    prob = Series [a]
   }
-allLost = keptRate 0.0
-noDelay = keptRate 1.0
+allLost = kept 0.0
+noDelay = kept 1.0
 ```
 Here:
 - `allLost` indicates that no message arrives ever through this connection
@@ -238,9 +238,9 @@ Here:
 3. Conjunction of two different actions simultaneously completed in parallel, and waits
 until they both are:
 ```
+-- For: deadline = deadline   rd1 `max` deadline   rd2
 rd1 `bothComplete` rd2 = LatencyDistribution {
-  -- deadline   = deadline   rd1 `max` deadline   rd2
-    completion = prob rd1 * cdf2 + prob rd2 * cdf1 - prob rd1 * prob rd2
+    prob = prob rd1 * cdf2 + prob rd2 * cdf1 - prob rd1 * prob rd2
   }
   where
     cdf1 = cumsum $ prob rd1
@@ -278,7 +278,8 @@ failover deadline rdTry rdCatch =
         $$A<t>B=A ∨\text{wait}(t)B \text{ when } t>d(A)$$
 
 5. Retransmission without rejection of previous messages: $A<t>>B$,
-   when we have a little different algebraic properties with *uncut* left argument:
+   when we have a little different algebraic properties with *uncut*
+   left argument:
    $$A<t>B=A ∨ \text{wait}_t\mathbf{;}B$$
    $$A<0>B=A ∨ B$$
    $$A<t>\text{fail}=A$$
@@ -311,7 +312,8 @@ In a simple instance where we consider: $$μX.A\mathbf{;}X$$
 We just compute
 remainder $R=Σ_{0..d(A)}A(i)$, and assume that all occurences of probabilities
 in the series $X$ are scaled by $1-R$.
- 6. Predictive Network Solutions proposed using operator $A⇆_p B$ for probabilistic
+ 6. Predictive Network Solutions (Neil and Peter) proposed using operator
+    $A⇆_p B$ for probabilistic
     choice between scenarios $A$ with probability $p$, and $B$ with probability
     $1-p$. This is not necessary, as long as we assume that the only
     way to get non-determinism is due to latency, and our miniprotocols
@@ -381,11 +383,13 @@ performance conditions on the network.
 
 ### Reachability of network broadcast or ∆R(t)
 
-Reachability curve $∆R(t)$ or _diffusion time_ is plotted as rate of nodes
-reached by broadcast from committee node, against time.
-We want to sum the curve for all possible core nodes.
+Reachability curve $∆R(t)$ or _diffusion time_ is plotted as distribution
+of event where all nodes are reached by broadcast from committee node,
+against time.
+We want to sum the curve for all possible core nodes, by picking a random
+core node.
 
-Area under the curve would tell us the overall network connectivity.
+Area under the curve would tell us the overall quality of the network.
 When curve reaches 100% rate, then we have a strongly connected network,
 which should be eventually always the case after necessary
 reconfigurations.
@@ -393,17 +397,16 @@ reconfigurations.
 _Note that when running experiments on multiple networks, we will need to indicate when we show average
 statistics for multiple networks, and when we show a statistic for a single network._
 
-### General treatment of completion rate over time
+### General treatment of completion distribution over time
 
 Whether might aim for minimum delay distribution of message
 over a given connection $∆Q(t)$ , minimum time of propagation
 of the message over entire network ($∆R(t)$, reachability), we still
-have a distribution of completion rate over time with standard operations.
+have a distribution of completion distribution over time with standard operations.
 
 We will need a standard library for treating these to speed up our computations.
 
-
-We can also define a mathematical ring of (rate, delay) pairs.
+We can also define a mathematical ring of (probability, delay) pairs.
 
 Note that `LatencyDistribution` is a modulus over ring R with `after` as multiplication,
 and `whicheverIsFaster` as addition. Then `noDelay` is neutral element
@@ -412,13 +415,9 @@ of multiplication (unit or one), and `bottom` is neutral element of addition.
 Note that both of these binary operators give also rise to two
 almost-scalar multiplication operators:
 ```
-scaleRate  s = after $ constantRate s
-scaleDelay s = after $ delay        s
+scaleProbability a = after $ attenuate a
+scaleDelay       t = after $ delay     t
 ```
-This is important, since generalizing the ring of reasonable values
-to a field (R, R) gives us opportunity to apply known good graph robustness
-algorithms like *effective graph resistance*.
-
 
 ### Description of network connectivity graph in terms of ∆Q
 
@@ -426,7 +425,7 @@ Traditional way of describing graphs is by adjacency matrix,
 where 0 means there is no edge, and 1 means that there is active edge.
 
 We may generalize it to unreliable network connections described above,
-by using $ΔQ $ instead of binary.
+by using $ΔQ$ instead of binary.
 
 So for each value diagonal, the network connection matrix $A$ will be `noDelay`,
 and $A_{i j}$ will represent the connection quality for messages sent from
@@ -436,8 +435,8 @@ That allows us to generalize typical graph algorithms executed to
 algorithms executed on network matrices:
 
 1. If series $R(A)=\Sigma{}_{n} A+A^2+...+A^n$ converges to matrix of non-zero
-(non-`allLost`) values *in all cells* in a finite number of steps, we consider graph to be
-*strongly connected* [@GeneralMethodOfShortestPaths].
+(non-`allLost`) values *in all cells* in a finite number of steps,
+we consider graph to be *strongly connected* [@GeneralMethodOfShortestPaths].
 Matrix multiplication follows uses $(\mathbf{;},∨)$-modulus.
 (So sequential composition in place of multiplication,
   and alternative selection in place of addition.)
@@ -511,8 +510,8 @@ before this performance goal is reached.
 One can imagine other key properties that network must satisfy:
 
 * That absent permanent failures, network will reach full connectivity.
-That corresponds to the situation where given ∆Q(t) ultimately reaches 100%
-delivery rate for some delay, ∆R(t) will also always reach 100%.
+That corresponds to the situation where given ∆Q(t) iCDF ultimately reaches 100%
+delivery probabiliity for some delay, ∆R(t) will also always reach 100%.
 *Moreover ∆R(t) metric allows to put deadline for reaching full connectivity
 in a convenient way.*
 * That given a fixed limit on rate of nodes joining and leaving the network,
@@ -556,7 +555,7 @@ than used by the algorithm.
       * computing $∆Q(t)$ and $∆R(t)$ curve for random network
       connections.
 5. Comparison with other metrics used for graph and network research
-      * visualizing one or multiple rate curves
+      * visualizing one or multiple distributions
       * assertions about classical graph algorithms vs rates
       * computing metrics random networks
 
@@ -569,18 +568,16 @@ than used by the algorithm.
 * proof that our policies are almost-optimal after convergence
 * expand the theory into capacity-limited networks
 * apply it to reason about latency of other protocols within Cardano
-
+* modelling a most adverse scenario [@ProgrammingSatan]
 
 
 # Acknowledgments
 
 Michał started writing, since the task seemed so easy to do within a month
 or two.
-Neil talked him into defining everything very carefully.
 Duncan made sure that discussion constructive proceeds
 for reasonable amount of time,
-and everybody follows. Peter made sure that the tasks is consistent with
-the networking requirements. Marcin made sure that nobody breaks the family
+and everybody follows. Marcin made sure that nobody breaks the family
 glasses. Karl provided online source of temptations to delay release.
 
 # Glossary
@@ -644,17 +641,5 @@ instance Foldable Series where
 instance Semigroup (Series a) where
   Series a <> Series b = Series (a <> b)
 ```
-
-# References not yet added to bibliography
-
-[2] [“Network Requirements” - Discussion. Prepared by Neil Davies and Peter Thompson , PNSol.Version 0.1 - 2017-10-10/13](https://input-output-rnd.slack.com/threads/convo/G930386BY-1554166072.004600/)
-
-[3] [Programming Satan's Computer](https://www.cl.cam.ac.uk/~rja14/Papers/satan.pdf) [@ProgrammingSatan]
-
-[5] [Homological Methods in Commutative Algebra. Raghavan, Balwant Singh, Sridharan](http://www.math.tifr.res.in/~publ/pamphlets/homological.pdf) [@HomologicalAlgebra]
-
-[6] [Homological Algebra on Wikipedia](https://en.wikipedia.org/wiki/Homological_algebra)
-
-
 
 # Bibliography
