@@ -107,9 +107,7 @@ $\mathcal{A}\in[0,1.0]$, which is probability.
 
 We also define domain of *time* or *delays* as $\mathcal{T}$.
 We also call a domain of $ΔQ$ functions as
-$\mathcal{Q}=\mathcal{T}×(\mathcal{T}\rightarrow{}\mathcal{A})$
-^[Pair of deadline, and function from time to arrival probability
-  at any given delay.].
+$\mathcal{Q}=(\mathcal{T}\rightarrow{}\mathcal{A})$.
 
 Below is Haskell specification of this datatype:
 ```{.haskell .literate}
@@ -127,33 +125,24 @@ cdf = cumsum . prob
 start = 0
 ```
 
+For ease of implementation, we express each function as a series of values
+for discrete delays. First value is for *no delay*.
 We define $start \in{}\mathcal{T}$ as smallest `Delay` (no delay).
 
 ## Intuitive properties of ΔQ
 
-We now assume that we have a quality metric $|ΔQ|$, and enumerate properties
-it should intuitively exhibit:
+1. We can define few *linear* operators on ΔQ (for exact definition, see next section):
 
-1. When shape of our improper CDF function stays the same,
-   but arrival probability uniformly
-   *drops* by factor $a∈\mathcal{A}$,
-   then our quality metric should proportionately drop: $a*|ΔQ(t)|=|a*ΔQ(t)|$.
-   (This is a *scalar multiplication* over our domain $\mathcal{Q}$.)
-2. When shape of our improper CDF stay the same, but delay uniformly
-   *stretches* by factor $d ∈ \mathcal{D}$,
-   then our quality metric should proportionately drop: $d*|ΔQ(t)|=|d*ΔQ(t)|$.
-   (This is another *scalar multiplication* over our domain $\mathcal{Q}$.)
-3. Or we can add a uniform delay $t ∈ \mathcal{D}$, and it will also behave
-   like scalar multiplication (we choose this approach as simpler)
-   ^[Note that all three can be implemented with the operations from algebra below.]
-4. We define a special improper CDF $kept(a)=<0, f(t)=a>$. This indicates
-   no delay. We note that $|kept(a_{2})|=a$.
-5. We define a special improper CDF that indicates a fixed delay:
-   $wait(t)=<t_d, f(t)= \begin{cases} 0 & \text{for } t<t_d \\ 1.0 & \text{for } t=t_d \end{cases}>$.
-   This indicates adding a fixed delay. We note that $|wait(t)|=t$.
-6. We should have a special CDF that represents *null delay* or *identity*,
-   where we pass every message with no delay: $kept(1)=wait(0)=1_{\mathcal{Q}}$.
-7. We can say that one $ΔQ$ no worse than the other,
+    A. Stretching in time -- ignored in here.
+
+    B. Delaying by $t$ -- composition with $\text{wait}$:
+$$wait(t)=f(t)= \begin{cases} 0 & \text{for } t<t_d \\ 1.0 & \text{for } t=t_d \end{cases}$$
+
+    C. Scaling arrival probability -- in other words, $\text{attenuation}$.
+
+2. We distinguish special distribution that represents *null delay* or *neutral element* of sequential composition, where we pass every message with no delay: $$attenuated(1)=wait(0)=1_{\mathcal{Q}}$$
+
+3. We can say that one $ΔQ$ no worse than the other,
    when it is improper CDF values never less than the other after making it fit a common
    domain:
 $$
@@ -165,17 +154,6 @@ X(ΔQ)(t)≡\begin{cases}ΔQ(t)     & \text{for } t≤d(ΔQ)\\
                       ΔQ(d(ΔQ)) & \text{otherwise}
          \end{cases}
 $$
-
-These properties give us hints about the metric we should have for $ΔQ$,
-scalar multiplications, special instances of the function,
-and properties for possible metric.
-_Altough metric is yet hard to intuitively define._
-
-We can define properties that natural ΔQ in ICDF form should satisfy:
-```
-prop_cdf_monotonic = undefined
-prop_cdf_deadline_is_nonnegative = undefined
-```
 
 ## Operations on ΔQ
 
@@ -200,10 +178,10 @@ rd1 `after` rd2 = LatencyDistribution {
                   }
 ```
 
-2. Alternative selection ⊕: given $ΔQ_1(t)$ and $ΔQ_2(t)$ of two different
+2. Alternative selection ∨: given $ΔQ_1(t)$ and $ΔQ_2(t)$ of two different
 connections, we should be able to compute the latency function
 for routing the message through pair of these connections in parallel:
-$ΔQ(t)=ΔQ_1(t) ΔQ_2(t)$.
+$ΔQ(t)=ΔQ_1(t)\mathbf{∨} ΔQ_2(t)$.
 * *associative*:
   $$ΔQ_1(t)∨[ΔQ_2(t)∨ΔQ_3(t)]=[ΔQ_1(t)∨ΔQ_2(t)]∨ΔQ_3(t)$$
 * *commutative*
@@ -228,8 +206,8 @@ Now let's define neutral elements of both operations above:
 attenuated a = LatencyDistribution {
     prob = Series [a]
   }
-allLost = kept 0.0
-noDelay = kept 1.0
+allLost = attenuated 0.0
+noDelay = attenuated 1.0
 ```
 Here:
 - `allLost` indicates that no message arrives ever through this connection
@@ -264,18 +242,21 @@ failover deadline rdTry rdCatch =
     initial = prob rdTry `cut` deadline
     remainder = 1 - sum (prob initial)
 ```
-   Algebraic properties of this operator are clear:
-        * Certain failure converts deadline into delay:
-        $$\text{fail}<t>A=\text{wait}_t\mathbf{;}A$$
-        * Failover to certain failure only cuts the latency curve:
-        $$A<t>\text{fail}=\text{cut}_{t}A$$
-        * Certain success ignores deadline:
-        $$1_Q<t>A=1_Q \text{ when } t>0$$
-        * Failover with no time left means discarding initial operation:
-        $$A<0>B=B$$
-        * When deadline is not shorter than maximum latency of left argument,
-          it is similar to alternative, with extra delay before second argument:
-        $$A<t>B=A ∨\text{wait}(t)B \text{ when } t>d(A)$$
+
+  Algebraic properties of this operator are clear:
+
+   * Certain failure converts deadline into delay:
+     $$\text{fail}<t>A=\text{wait}_t\mathbf{;}A$$
+   * Failover to certain failure only cuts the latency curve:
+     $$A<t>\text{fail}=\text{cut}_{t}A$$
+   * Certain success ignores deadline:
+     $$1_Q<t>A=1_Q \text{ when } t>0$$
+   * Failover with no time left means discarding initial operation:
+     $$A<0>B=B$$
+
+   * When deadline is not shorter than maximum latency of left argument,
+     it is similar to alternative, with extra delay before second argument:
+     $$A<t>B=A ∨\text{wait}(t)B \text{ when } t>d(A)$$
 
 5. Retransmission without rejection of previous messages: $A<t>>B$,
    when we have a little different algebraic properties with *uncut*
@@ -285,52 +266,13 @@ failover deadline rdTry rdCatch =
    $$A<t>\text{fail}=A$$
    $$\text{fail}<t>A=A$$
 
-5. Finally we borrow $μ$ operator to describe iterative miniprotocols
-   like unbounded retransmission:
-   $$μX.f(X)$$
-   Given expression $f(X)$ with free variable $X$, we assume it describes
-   the distribution that depends on its own definition $X$.
-   Necessary conditions for such definition are that it describes
-   at least one terminal value of the ΔQ before
-   looping.
-```haskell
-mu :: LatencyDistribution → LatencyDistribution
-mu = undefined
-```
-   For practical purposes we will rather use bounded iteration:
-   $$μ_{n}X[Y].f(X)≡f^{n}(Y)$$.
-   Which is $f$ iterated $n$ times, and applied to final value $Y$.
-```haskell
-iterate :: (LatencyDistribution → LatencyDistribution)
-        →   LatencyDistribution → LatencyDistribution
-```
-This operator seems elegant way of reasoning about infinite retransmission,
-where we treat finite description of process that has no bounds on the
-number of retransmissions.
-Note that probabilities of each occurence of $X$ in $f(X)$ need to scaled down.
-In a simple instance where we consider: $$μX.A\mathbf{;}X$$
-We just compute
-remainder $R=Σ_{0..d(A)}A(i)$, and assume that all occurences of probabilities
-in the series $X$ are scaled by $1-R$.
- 6. Predictive Network Solutions (Neil and Peter) proposed using operator
+6. Predictive Network Solutions (Neil and Peter) proposed using operator
     $A⇆_p B$ for probabilistic
     choice between scenarios $A$ with probability $p$, and $B$ with probability
     $1-p$. This is not necessary, as long as we assume that the only
     way to get non-determinism is due to latency, and our miniprotocols
     involve only deterministic computation, and *unique agency property*
     described by Marcin.
-
-# Defining metrics
-
-Given that we already have three scalar multiplications,
-we may derive properties of the metric that is consistent with these:
-$$ |A| = Σ_{t∈0..d(A)} \frac{|A(t)|}{t}$$
-
-Note the use of discrete summation instead of integral,
-since delay-free loss $loss(x)$ is measurable worsening of the metric,
-even though there is only one value of $t=0$ over which to integrate.
-^[And as Doron Zeilberger mentions, continuous analysis is only a special case
-  of discrete.[@Zeilberger]]
 
 ## Estimates
 Note that we can define derived estimates of
@@ -372,7 +314,7 @@ and zero value `allLost` corresponding to nodes that are not directly connected.
 We can generalize simple way of checking that graph is strongly connected:
 
 
-...
+$R_n(A)=1+A+A^2+...+A^n$
 
 Our key metric would be diffusion or reachability time of the network $∆R(t)$, which is conditioned
 by quality of connection curves $∆Q(t)$ and the structure network graph.
@@ -434,7 +376,7 @@ node $i$ to node $j$.
 That allows us to generalize typical graph algorithms executed to
 algorithms executed on network matrices:
 
-1. If series $R(A)=\Sigma{}_{n} A+A^2+...+A^n$ converges to matrix of non-zero
+1. If series $R_n(A)=1+A+A^2+...+A^n$ converges to matrix of non-zero
 (non-`allLost`) values *in all cells* in a finite number of steps,
 we consider graph to be *strongly connected* [@GeneralMethodOfShortestPaths].
 Matrix multiplication follows uses $(\mathbf{;},∨)$-modulus.
