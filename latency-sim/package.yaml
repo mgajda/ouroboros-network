@@ -29,6 +29,7 @@ library:
   dependencies:
     - markdown-unlit
     - time
+    - QuickCheck
 
 executables:
   hide-codeblocks:

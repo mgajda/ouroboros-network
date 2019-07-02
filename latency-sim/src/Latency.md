@@ -23,12 +23,18 @@ bibliography:
 
 ```{.haskell .hidden}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedLists   #-}
+{-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE UnicodeSyntax     #-}
 module Latency where
 
+import GHC.Exts(IsList(..))
 import Data.Time
 import Data.Semigroup
+import Test.QuickCheck
+import Test.QuickCheck.All
 
 ```
 
@@ -112,8 +118,9 @@ $\mathcal{Q}=(\mathcal{T}\rightarrow{}\mathcal{A})$.
 Below is Haskell specification of this datatype:
 ```{.haskell .literate}
 
-type Probability = Double -- between 0.0 and 1.0
-newtype Delay = Delay Int
+type    Probability = Double -- between 0.0 and 1.0
+newtype Delay       = Delay Int
+  deriving (Num, Ord, Eq)
 
 newtype LatencyDistribution =
   LatencyDistribution {
@@ -196,18 +203,18 @@ of two alternative events:
 ```haskell
 rd1 `whicheverIsFaster` rd2 = LatencyDistribution {
   -- deadline = deadline   rd1 `max` deadline   rd2
-     prob     = prob rd1 + prob rd2
-              - prob rd1 * prob rd2
+     prob     = prob rd1  +  prob rd2
+              - prob rd1 .*. prob rd2
   }
 (∨) = whicheverIsFaster
 ```
 Now let's define neutral elements of both operations above:
-```
+```haskell
 attenuated a = LatencyDistribution {
     prob = Series [a]
   }
-allLost = attenuated 0.0
-noDelay = attenuated 1.0
+allLostLD = attenuated 0.0
+noDelayLD = attenuated 1.0
 ```
 Here:
 - `allLost` indicates that no message arrives ever through this connection
@@ -215,10 +222,10 @@ Here:
 
 3. Conjunction of two different actions simultaneously completed in parallel, and waits
 until they both are:
-```
+```haskell
 -- For: deadline = deadline   rd1 `max` deadline   rd2
 rd1 `bothComplete` rd2 = LatencyDistribution {
-    prob = prob rd1 * cdf2 + prob rd2 * cdf1 - prob rd1 * prob rd2
+    prob = prob rd1 .*. cdf2 + prob rd2 .*. cdf1 - prob rd1 .*. prob rd2
   }
   where
     cdf1 = cumsum $ prob rd1
@@ -239,8 +246,11 @@ failover deadline rdTry rdCatch =
         prob     = initial <> fmap (remainder*) (prob rdCatch)
     }
   where
-    initial = prob rdTry `cut` deadline
-    remainder = 1 - sum (prob initial)
+    initial :: Series Double
+    initial = cut deadline $ prob rdTry
+    -- | Subtractive remainder of the accepted part of time-to-complete:
+    remainder :: Double
+    remainder = 1 - sum initial
 ```
 
   Algebraic properties of this operator are clear:
@@ -278,26 +288,34 @@ failover deadline rdTry rdCatch =
 Note that we can define derived estimates of
 `LatencyDistribution`
 that somewhat approximate it:
-```
-newtype Deadline = Deadline Delay
-deadline :: LatencyDistribution -> Deadline
-deadline  = length . prob
+```haskell
+newtype Latest = Latest Delay
+latest :: LatencyDistribution -> Latest
+latest  = Latest . Delay . length . prob
 
 newtype Earliest = Earliest Delay
 earliest :: LatencyDistribution -> Earliest
-earliest  = length . takeWhile (0==) . prob
+earliest  = Earliest . Delay . length . takeWhile (0==) . prob
 ```
 These estimates have the property that we can easily compute
 the same operations on estimates, without really computing
 the full `LatencyDistribution`.
 
-```
-class QualityEstimate e where
-  firstToFinish :: e -> e -> e
-  lastToFinish  :: e -> e -> e
-  andThen       :: e -> e -> e
+```haskell
+class TimeToCompletion ttc where
+  firstToFinish :: ttc -> ttc -> ttc
+  lastToFinish  :: ttc -> ttc -> ttc
+  andThen       :: ttc -> ttc -> ttc
+  noDelay       :: ttc
+  never         :: ttc
   -- | Add explicit case/if to make correct estimate
   --   single pass instead of trace
+instance TimeToCompletion LatencyDistribution where
+  firstToFinish = firstToFinishLD
+  lastToFinish  = lastToFinishLD
+  andThen       = after
+  noDelay       = noDelayLD
+  never         = allLostLD
 ```
 
 # Representing networks
@@ -356,7 +374,7 @@ of multiplication (unit or one), and `bottom` is neutral element of addition.
 ^[This field definition will be used for multiplication of connection matrices.]
 Note that both of these binary operators give also rise to two
 almost-scalar multiplication operators:
-```
+```haskell
 scaleProbability a = after $ attenuate a
 scaleDelay       t = after $ delay     t
 ```
@@ -517,7 +535,7 @@ than used by the algorithm.
 
 Michał started writing, since the task seemed so easy to do within a month
 or two.
-Duncan made sure that discussion constructive proceeds
+Duncan made sure that discussion constructively proceeds
 for reasonable amount of time,
 and everybody follows. Marcin made sure that nobody breaks the family
 glasses. Karl provided online source of temptations to delay release.
@@ -537,28 +555,30 @@ glasses. Karl provided online source of temptations to delay release.
 ```haskell
 (|*|) = undefined -- matrix multiplication
 frob = undefined -- Frobenius metric
-convolve = undefined
-fromList = undefined
-instance Num Delay where
-  (+) = undefined
-  (*) = undefined
-  abs = undefined
-  signum = undefined
-  fromInteger = undefined
-  (-) = undefined
-instance Ord Delay where
-  compare = undefined
+infixl 7 .* -- same precedence as *
+-- | Scalar multiplication
+(.*):: Num a => a -> Series a -> Series a -- type declaration for .*
+c .* (Series (f:fs)) = Series (c*f : unSeries ( c.* Series fs)) -- definition of .*
+c .* (Series []    ) = Series []
+-- | Convolution from McIlroy
+convolve :: Num a => Series a -> Series a -> Series a
+(Series (f:fs)) `convolve` gg@(Series (g:gs)) =
+  Series (f*g : unSeries (f .* Series gs + (Series fs `convolve` gg)))
+(Series []    ) `convolve` _                  =
+  Series []
+
+test_convolve = convolve [1,1] [1,1] == ([1,2,1] :: Series Double)
+elementwise f (Series a) (Series b) = Series (zipWith f a b)
+
+(.*.) = elementwise (*)
 
 instance Num a => Num (Series a) where
-  (+) = undefined
-  (*) = undefined
-  abs = undefined
-  signum = undefined
+  (+) = elementwise (+)
+  (*) = convolve
+  abs = fmap abs
+  signum = fmap signum
   fromInteger = undefined
-  negate (Series s)= Series $ negate <$> s
-
-instance Eq Delay where
-  (==) = undefined
+  negate = fmap negate
 ```
 
 # Appendix: Power series
@@ -566,22 +586,27 @@ instance Eq Delay where
 Here we follow [@PowerSeries]:
 ```haskell
 -- | Put more code here...
-data Series a = Series [a]
+data Series a = Series { unSeries :: [a] }
+  deriving (Eq, Ord)
 -- | Cumulative sums computes sums of 1..n-th term of the series
-cumsum = undefined
+cumsum = Series . scanl (+) 0 . unSeries
 -- | Subtractive remainders computes running remainders to 1.0 after summing up
---   all terms of the series up to given position.
-subrem = undefined
+--   all terms of the series up to a given position.
+subrem = Series . scanl (-) 1 . unSeries
 
-completion = undefined
-iterate = undefined
-cut = undefined
+--completion = undefined
+cut :: Delay -> Series a -> Series a
+cut (Delay t) (Series s) = Series (take t s)
 instance Functor Series where
   fmap f (Series a) = Series (fmap f a)
 instance Foldable Series where
   foldr f e (Series s) = foldr f e s
 instance Semigroup (Series a) where
   Series a <> Series b = Series (a <> b)
+instance IsList (Series a) where
+  type Item (Series a) = a
+  fromList          = Series
+  toList (Series s) = s
 ```
 
 # Bibliography
