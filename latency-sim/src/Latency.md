@@ -29,6 +29,7 @@ bibliography:
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE UnicodeSyntax     #-}
+{-# LANGUAGE ViewPatterns      #-}
 module Latency where
 
 import GHC.Exts(IsList(..))
@@ -121,7 +122,7 @@ $\mathcal{Q}=(\mathcal{T}\rightarrow{}\mathcal{A})$.
 Below is Haskell specification of this datatype:
 ```{.haskell .literate}
 
-newtype Probability = Prob Double -- between 0.0 and 1.0
+newtype Probability = Prob { unProb :: Double } -- between 0.0 and 1.0
   deriving (Num, Fractional, Real, Floating, Ord, Eq,
             Arbitrary, CoArbitrary, Show)
 newtype Delay       = Delay Int
@@ -132,11 +133,15 @@ newtype LatencyDistribution =
     -- | Monotonically growing like any CDF. May not reach 1.
     prob :: Series Probability
   }
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord)
+
 instance IsList LatencyDistribution where
   type Item LatencyDistribution = Probability
   fromList = LatencyDistribution . Series
   toList   = unSeries . prob
+
+instance Show LatencyDistribution where
+  showsPrec _ ld s = "LatencyDistribution "++ showsPrec 0 (fmap unProb $ unSeries $ prob ld) s
 
 cdf :: LatencyDistribution -> Series Probability
 cdf = cumsum . prob
@@ -189,7 +194,7 @@ in parallel: $$ΔQ(t)=ΔQ_1(t)\mathbf{;}ΔQ_2(t)$$.
     * *neutral element* is $1_{\mathcal{Q}}$ or `noDelay`, so:
       $$ΔQ(t)\mathbf{;}1_{\mathcal{Q}}=1_{\mathcal{Q}}\mathbf{;}ΔQ(t)=ΔQ(t)$$
 
-```haskell
+```{.haskell}
 rd1 `afterLD` rd2 = LatencyDistribution {
                   --  deadline = deadline   rd1      +     deadline   rd2
                     prob     = prob rd1 `convolve` prob rd2
@@ -211,7 +216,7 @@ Here is the Haskell code for naive definition of these two operations:
 We can also introduce alternative of two completion distributions.
 It corresponds to a an event that is earliest possible conclusion of one
 of two alternative events:
-```haskell
+```{.haskell}
 rd1 `firstToFinishLD` rd2 = LatencyDistribution {
   -- deadline = deadline   rd1 `max` deadline   rd2
      prob     = prob rd1  +  prob rd2
@@ -221,7 +226,7 @@ rd1 `firstToFinishLD` rd2 = LatencyDistribution {
 (∨) = firstToFinish
 ```
 Now let's define neutral elements of both operations above:
-```haskell
+```{.haskell}
 attenuated a = LatencyDistribution {
     prob = Series [a]
   }
@@ -234,7 +239,7 @@ Here:
 
 3. Conjunction of two different actions simultaneously completed in parallel, and waits
 until they both are:
-```haskell
+```{.haskell}
 -- For: deadline = deadline   rd1 `max` deadline   rd2
 rd1 `lastToFinishLD` rd2 = LatencyDistribution {
     prob = prob rd1 .*. cdf2 + prob rd2 .*. cdf1 - prob rd1 .*. prob rd2
@@ -311,7 +316,9 @@ onLatest = liftBinOp unLatest Latest
 newtype Earliest = Earliest { unEarliest :: Delay }
   deriving (Eq, Ord, Show)
 earliest :: LatencyDistribution -> Earliest
-earliest  = Earliest . Delay . (max 0) . length . takeWhile (0==) . unSeries . prob
+earliest [x]                             = Earliest 0
+earliest (last . unSeries . prob -> 0.0) = error "LatencyDistribution should always end with non-zero value"
+earliest  other                          = Earliest . Delay . (max 0) . length . takeWhile (0==) . unSeries . prob $ other
 
 -- TODO: place for a lens?
 onEarliest = liftBinOp unEarliest Earliest
@@ -333,7 +340,7 @@ These estimates have the property that we can easily compute
 the same operations on estimates, without really computing
 the full `LatencyDistribution`.
 
-```haskell
+```{.haskell}
 class TimeToCompletion ttc where
   firstToFinish :: ttc -> ttc -> ttc
   lastToFinish  :: ttc -> ttc -> ttc
@@ -349,7 +356,8 @@ instance TimeToCompletion LatencyDistribution where
   after         = afterLD
   noDelay       = noDelayLD
 
-approximatesTTC compatible extract a b =
+-- | Specify the functor with respect to TTC operations
+verifyTTCFunctor compatible extract a b =
      (         (a `firstToFinish`         b) `compatible`
       (extract  a `firstToFinish` extract b)) &&
      (         (a `lastToFinish`          b) `compatible`
@@ -358,9 +366,6 @@ approximatesTTC compatible extract a b =
       (extract  a `after`         extract b)) &&
                    noDelay                   `compatible` noDelay
 
-earliestApproximatesTTC = approximatesTTC (\a b -> earliest a == b) earliest
-
-latestApproximatesTTC   = approximatesTTC (\a b -> latest   a == b) latest
 ```
 
 # Representing networks
@@ -419,7 +424,7 @@ of multiplication (unit or one), and `bottom` is neutral element of addition.
 ^[This field definition will be used for multiplication of connection matrices.]
 Note that both of these binary operators give also rise to two
 almost-scalar multiplication operators:
-```haskell
+```{.haskell}
 scaleProbability a = after $ attenuated a
 scaleDelay  :: Delay -> LatencyDistribution -> LatencyDistribution
 scaleDelay       t = after $ delay      t
