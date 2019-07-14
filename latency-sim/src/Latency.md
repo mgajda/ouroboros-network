@@ -35,9 +35,11 @@ module Latency where
 import GHC.Exts(IsList(..))
 import Data.Function(on)
 import Data.Time
+import Data.Ratio((%))
 import Data.Semigroup
 import Test.QuickCheck
 import Test.QuickCheck.All
+import Test.QuickCheck.Gen(vectorOf)
 import Test.QuickCheck.Modifiers
 
 ```
@@ -124,16 +126,44 @@ Below is Haskell specification of this datatype:
 
 newtype Probability = Prob { unProb :: Double } -- between 0.0 and 1.0
   deriving (Num, Fractional, Real, Floating, Ord, Eq,
-            Arbitrary, CoArbitrary, Show)
+            CoArbitrary, Show)
 newtype Delay       = Delay Int
   deriving (Num, Ord, Eq, Enum, Bounded, CoArbitrary, Show)
+
+instance Arbitrary Probability where
+  arbitrary = sized $ \aSize -> do
+      let precision = fromIntegral (aSize `max` minPrecision)
+      denominator <- choose (1, precision  )
+      numerator   <- choose (0, denominator)
+      pure         $ Prob (fromRational (numerator % denominator))
+    where
+      minPrecision = 10
+  shrink (Prob x) = filter isValidProbability (Prob <$> shrink x)
+
+isValidProbability :: Probability -> Bool
+isValidProbability p = p>= 0 && p<=1.0
 
 newtype LatencyDistribution =
   LatencyDistribution {
     -- | Monotonically growing like any CDF. May not reach 1.
     prob :: Series Probability
   }
-  deriving (Eq, Ord)
+
+-- | Lexicographic ordering to get the equality
+instance Eq LatencyDistribution where
+  xs == ys = (lexCompare `on` (unSeries . prob)) xs ys == EQ
+    where
+      lexCompare :: [Probability] -> [Probability] -> Ordering
+      lexCompare  xs     []    = if all (==0.0) xs
+                                 then EQ
+                                 else LT
+      lexCompare  []     xs    = invertComparison $ lexCompare xs []
+      lexCompare (x:xs) (y:ys) = case compare x y of
+                                EQ    -> lexCompare xs ys
+                                other -> other
+      invertComparison LT = GT
+      invertComparison GT = LT
+      invertComparison EQ = EQ
 
 instance IsList LatencyDistribution where
   type Item LatencyDistribution = Probability
@@ -142,6 +172,20 @@ instance IsList LatencyDistribution where
 
 instance Show LatencyDistribution where
   showsPrec _ ld s = "LatencyDistribution "++ showsPrec 0 (fmap unProb $ unSeries $ prob ld) s
+
+-- | Validity criteria
+isValidLD :: LatencyDistribution -> Bool
+isValidLD []            = False
+isValidLD [x]           = True -- any distribution with a single-element domain is valid (even one that delivers nothing)
+isValidLD (last . unSeries . prob -> 0.0) = False -- any distribution with more than one element and last element of zero is invalid (to prevent redundant representations.)
+isValidLD (prob -> probs) = (sum probs) <= 1.0 -- sum of probabilities shall never exceed 0.0
+                         && all isValidProbability probs -- each value must be valid value for probability
+
+canonicalizeLD = assureAtLeastOneElement . dropTrailingZeros
+  where
+    assureAtLeastOneElement []    = [0.0]
+    assureAtLeastOneElement other = other
+    dropTrailingZeros             = reverse . dropWhile (==0.0) . reverse
 
 cdf :: LatencyDistribution -> Series Probability
 cdf = cumsum . prob
@@ -608,7 +652,7 @@ glasses. Karl provided online source of temptations to delay release.
 
 # Appendix: Missing definitions
 
-```haskell
+```{.haskell}
 (|*|) = undefined -- matrix multiplication
 frob = undefined -- Frobenius metric
 infixl 7 .* -- same precedence as *
@@ -623,13 +667,20 @@ convolve :: Num a => Series a -> Series a -> Series a
 (Series []    ) `convolve` _                  =
   Series []
 
-test_convolve = convolve [1,1] [1,1] == ([1,2,1] :: Series Probability)
-elementwise f (Series a) (Series b) = Series (zipWith f a b)
+elementwise f (Series a) (Series b) = Series (go f a b)
+  where
+    go f []        ys  = ( f  0.0) <$>        ys
+    go f xs      []    = (`f` 0.0) <$>     xs
+    go f (x:xs) (y:ys) = (x `f` y)  : go f xs ys
 
-(.*.) = elementwise (*)
+Series a .*. Series b = Series (zipWith (*) a b)
 
 instance Num a => Num (Series a) where
-  (+) = elementwise (+)
+  Series a + Series b = Series (go a b)
+    where
+      go    []     ys  = ys
+      go    xs     []  = xs
+      go (x:xs) (y:ys) = (x+y):go xs ys
   (*) = convolve
   abs = fmap abs
   signum = fmap signum
@@ -641,15 +692,20 @@ liftBinOp unpack pack op a b = pack (unpack a `op` unpack b)
 
 instance Arbitrary Delay where
   arbitrary = getNonNegative <$> arbitrary
+  shrink (Delay d) = Delay <$> shrinkIntegral d
 
 instance Arbitrary LatencyDistribution where
   arbitrary = sized $ \maxLen -> do
     actualLen <- choose (0, maxLen-1)
-    LatencyDistribution . Series <$> case actualLen of
-      0 -> (:[]) <$> arbitrary
-      _ -> -- Last should be non-zero
-           (++) <$> vector actualLen
-                <*> ((:[]) . getPositive <$> arbitrary)
+    ld <- LatencyDistribution . Series <$> case actualLen of
+            0 -> (:[]) <$> arbitrary
+            _ -> -- Last should be non-zero
+                 (++) <$> vector actualLen
+                      <*> ((:[]) . getPositive <$> arbitrary)
+    if isValidLD ld
+       then pure ld
+       else arbitrary
+  shrink (unSeries . prob -> ls) = LatencyDistribution <$> Series <$> recursivelyShrink ls
 ```
 
 # Appendix: Power series

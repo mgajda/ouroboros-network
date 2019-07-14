@@ -30,6 +30,7 @@ library:
     - markdown-unlit
     - time
     - QuickCheck
+    - statistics
 
 executables:
   hide-codeblocks:
@@ -54,5 +55,6 @@ tests:
     - latency-sim
     - QuickCheck
     - hspec
+    - statistics
     build-tools:
     - hspec-discover

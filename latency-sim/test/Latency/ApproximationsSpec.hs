@@ -27,8 +27,8 @@ spec = do
                property $ \x -> earliest x >= Earliest 0
              it "earliest of single element series is always 0" $
                property $ \x -> earliest [x] == Earliest 0
-             it "earliest of n element series of non-zero elements is always its zero" $
-               property $ \(Positive x) (NonNegative n) -> earliest (fromList $ replicate n x) == Earliest 0
+             it "earliest of n element series of non-zero elements is always zero" $
+               property $ \(Positive x) (Positive n) -> earliest (fromList $ replicate n x) == Earliest 0
              skip $ it "earliest of allLost is 0" $ do
                earliest allLostLD == Earliest 0
              it "earliest of delay t is t" $ do

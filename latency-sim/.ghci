@@ -1,0 +1,3 @@
+:set -XOverloadedLists
+:set -XScopedTypeVariables
+import Latency
