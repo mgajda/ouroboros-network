@@ -1,0 +1,63 @@
+---
+author:
+  - Michał J. Gajda
+  - Karl      Knutsson
+  - Duncan    Coutts
+  - Marcin    Szamotulski
+title: Curious properties of latency distributions
+abstract: |
+  Network latency distributions, their algebra, and use examples.
+date: June 25 2019, v1.9
+input: markdown+tex_math_dollars+yaml_metadata_block+citations
+output:
+  pdf_document:
+    keep_tex: true
+    toc: true
+    toc_depth: 2
+    mainfont: "DejaVu Serif"
+    sansfont: Arial
+    latex_engine: xelatex
+bibliography:
+  - Latency.bib
+---
+
+# Introduction
+
+In order to accurately simulate capacity-insensitive network miniprotocols
+[@cardanoNetworkRequirements],
+we formally define network latency distribution as improper CDF
+(cumulative distribution function) of arrived messages over time.
+We call it improper CDF, because it does not end at 100%,
+since some messages can be lost.
+
+Starting with description of its apparent properties, we identify
+their mathematical definitions, and ultimately arrive at algebra of ΔQ
+with basic operations that correspond to abstract interpretations
+of network miniprotocols[@ProgramAnalysis].
+
+This allows us to use objects from single algebraic body to describe
+behaviour of entire protocols as improper CDFs.
+
+
+## Related work
+Our goal here is to establish realm of reasonable performance metrics for
+Peer Discovery and similar miniprotocols of Cardano settlement layer
+[@PeerDiscovery].
+
+Then we discuss expansion of the concept to get most sensitive metrics
+of protocol and network robustness[@NetworkRobustness].
+However instead of heuristic measure like effective graph resistance
+[@EffectiveGraphResistance], we use logically justified measure derived
+from the actual behaviour of the network.
+
+This is similar to *network calculus* but uses simpler methods
+and uses more logical description with improper latency distribution functions,
+instead of *max-plus* and *min-plus* algebras.
+^[We describe how it generalizes these *max-plus* and *min-plus* algebras later.]
+Basic operations ∧ and ∨ are similar to last-to-finish and first-to-finish
+synchronizations [@bradley].
+
+This approach allows us to use *abstract interpretation*[@ProgramAnalysis]
+of computer program to get its latency distribution, or a single execution
+to approximate latency distribution assuming the same loss profile of packets.
+

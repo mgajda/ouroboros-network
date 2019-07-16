@@ -26,6 +26,7 @@ bibliography:
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedLists   #-}
+{-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE UnicodeSyntax     #-}
@@ -33,56 +34,20 @@ bibliography:
 module Latency where
 
 import GHC.Exts(IsList(..))
+import Control.Monad.Primitive(PrimMonad(..))
+import Control.Monad(replicateM)
 import Data.Function(on)
-import Data.Time
-import Data.Ratio((%))
 import Data.Semigroup
+import qualified Statistics.Distribution as Statistics(ContGen(..))
+import qualified System.Random.MWC as MWC(Gen, withSystemRandom)
 import Test.QuickCheck
-import Test.QuickCheck.All
-import Test.QuickCheck.Gen(vectorOf)
-import Test.QuickCheck.Modifiers
+
+import Probability
+import Delay
+import Series
 
 ```
-
-# Introduction
-
-In order to accurately simulate capacity-insensitive network miniprotocols
-[@cardanoNetworkRequirements],
-we formally define network latency distribution as improper CDF
-(cumulative distribution function) of arrived messages over time.
-We call it improper CDF, because it does not end at 100%,
-since some messages can be lost.
-
-Starting with description of its apparent properties, we identify
-their mathematical definitions, and ultimately arrive at algebra of ΔQ
-with basic operations that correspond to abstract interpretations
-of network miniprotocols[@ProgramAnalysis].
-
-This allows us to use objects from single algebraic body to describe
-behaviour of entire protocols as improper CDFs.
-
-
-## Related work
-Our goal here is to establish realm of reasonable performance metrics for
-Peer Discovery and similar miniprotocols of Cardano settlement layer
-[@PeerDiscovery].
-
-Then we discuss expansion of the concept to get most sensitive metrics
-of protocol and network robustness[@NetworkRobustness].
-However instead of heuristic measure like effective graph resistance
-[@EffectiveGraphResistance], we use logically justified measure derived
-from the actual behaviour of the network.
-
-This is similar to *network calculus* but uses simpler methods
-and uses more logical description with improper latency distribution functions,
-instead of *max-plus* and *min-plus* algebras.
-^[We describe how it generalizes these *max-plus* and *min-plus* algebras later.]
-
-This approach allows us to use *abstract interpretation*[@ProgramAnalysis]
-of computer program to get its latency distribution, or a single execution
-to approximate latency distribution assuming the same loss profile of packets.
-
-# Curious properties of latency distributions
+# Latency distributions
 
 ## Introducing improper CDF
 
@@ -111,11 +76,12 @@ as $d(t)=\text{maxarg}_{t}(ΔQ(t))$ or such $t$ for which our improper CDF reach
 maximum value.
 We also define *ultimate arrival probability* formally as $a_{u}(ΔQ)=\max(ΔQ)$.
 Our improper CDFs are assumed to be always defined within finite subrange
-of delays, starting at $0$. Ultimate arrival probability allows us
+of delays, starting at $0$. Ultimate arrival probability
+allows us
 to compare attenuation between two links.
 
 In the following we define domain of *arrival probabilities* as
-$\mathcal{A}\in[0,1.0]$, which is probability.
+$\mathcal{A}\in[0,1.0]$, which is [probability](#probability).
 
 We also define domain of *time* or *delays* as $\mathcal{T}$.
 We also call a domain of $ΔQ$ functions as
@@ -123,78 +89,26 @@ $\mathcal{Q}=(\mathcal{T}\rightarrow{}\mathcal{A})$.
 
 Below is Haskell specification of this datatype:
 ```{.haskell .literate}
-
-newtype Probability = Prob { unProb :: Double } -- between 0.0 and 1.0
-  deriving (Num, Fractional, Real, Floating, Ord, Eq,
-            CoArbitrary, Show)
-newtype Delay       = Delay Int
-  deriving (Num, Ord, Eq, Enum, Bounded, CoArbitrary, Show)
-
-instance Arbitrary Probability where
-  arbitrary = sized $ \aSize -> do
-      let precision = fromIntegral (aSize `max` minPrecision)
-      denominator <- choose (1, precision  )
-      numerator   <- choose (0, denominator)
-      pure         $ Prob (fromRational (numerator % denominator))
-    where
-      minPrecision = 10
-  shrink (Prob x) = filter isValidProbability (Prob <$> shrink x)
-
-isValidProbability :: Probability -> Bool
-isValidProbability p = p>= 0 && p<=1.0
-
 newtype LatencyDistribution =
   LatencyDistribution {
     -- | Monotonically growing like any CDF. May not reach 1.
     prob :: Series Probability
   }
-
--- | Lexicographic ordering to get the equality
-instance Eq LatencyDistribution where
-  xs == ys = (lexCompare `on` (unSeries . prob)) xs ys == EQ
-    where
-      lexCompare :: [Probability] -> [Probability] -> Ordering
-      lexCompare  xs     []    = if all (==0.0) xs
-                                 then EQ
-                                 else LT
-      lexCompare  []     xs    = invertComparison $ lexCompare xs []
-      lexCompare (x:xs) (y:ys) = case compare x y of
-                                EQ    -> lexCompare xs ys
-                                other -> other
-      invertComparison LT = GT
-      invertComparison GT = LT
-      invertComparison EQ = EQ
-
-instance IsList LatencyDistribution where
-  type Item LatencyDistribution = Probability
-  fromList = LatencyDistribution . Series
-  toList   = unSeries . prob
-
-instance Show LatencyDistribution where
-  showsPrec _ ld s = "LatencyDistribution "++ showsPrec 0 (fmap unProb $ unSeries $ prob ld) s
-
--- | Validity criteria
-isValidLD :: LatencyDistribution -> Bool
-isValidLD []            = False
-isValidLD [x]           = True -- any distribution with a single-element domain is valid (even one that delivers nothing)
-isValidLD (last . unSeries . prob -> 0.0) = False -- any distribution with more than one element and last element of zero is invalid (to prevent redundant representations.)
-isValidLD (prob -> probs) = (sum probs) <= 1.0 -- sum of probabilities shall never exceed 0.0
-                         && all isValidProbability probs -- each value must be valid value for probability
-
-canonicalizeLD = assureAtLeastOneElement . dropTrailingZeros
-  where
-    assureAtLeastOneElement []    = [0.0]
-    assureAtLeastOneElement other = other
-    dropTrailingZeros             = reverse . dropWhile (==0.0) . reverse
-
+```
+Its cumulative distribution function can be trivially computed with running sum:
+```
 cdf :: LatencyDistribution -> Series Probability
 cdf = cumsum . prob
-start = 0
 ```
 
 For ease of implementation, we express each function as a series of values
-for discrete delays. First value is for *no delay*.
+for [discrete delays](#delay). First value is for *no delay*.
 We define $start \in{}\mathcal{T}$ as smallest `Delay` (no delay).
+
+```
+start :: Delay
+start  = Delay 0
+```
 
 ## Intuitive properties of ΔQ
 
@@ -240,7 +154,6 @@ in parallel: $$ΔQ(t)=ΔQ_1(t)\mathbf{;}ΔQ_2(t)$$.
 
 ```{.haskell}
 rd1 `afterLD` rd2 = LatencyDistribution {
-                  --  deadline = deadline   rd1      +     deadline   rd2
                     prob     = prob rd1 `convolve` prob rd2
                   }
 ```
@@ -262,7 +175,6 @@ It corresponds to a an event that is earliest possible conclusion of one
 of two alternative events:
 ```{.haskell}
 rd1 `firstToFinishLD` rd2 = LatencyDistribution {
-  -- deadline = deadline   rd1 `max` deadline   rd2
      prob     = prob rd1  +  prob rd2
               - prob rd1 .*. prob rd2
   }
@@ -284,7 +196,6 @@ Here:
 3. Conjunction of two different actions simultaneously completed in parallel, and waits
 until they both are:
 ```{.haskell}
--- For: deadline = deadline   rd1 `max` deadline   rd2
 rd1 `lastToFinishLD` rd2 = LatencyDistribution {
     prob = prob rd1 .*. cdf2 + prob rd2 .*. cdf1 - prob rd1 .*. prob rd2
   }
@@ -300,7 +211,7 @@ corresponding improper CDF of message arrival.
 
 4. Failover $A<t>B$ when action is attempted for a fixed period of time $t$,
    and if it does not complete in this time, the other action is attempted:
-```haskell
+```{.haskell .literate}
 failover deadline rdTry rdCatch =
     LatencyDistribution {
       --  deadline = deadline rdTry
@@ -339,58 +250,27 @@ failover deadline rdTry rdCatch =
    $$\text{fail}<t>A=A$$
 
 6. Predictive Network Solutions (Neil and Peter) proposed using operator
-    $A⇆_p B$ for probabilistic
+    $A⇆_{p} B$ for probabilistic
     choice between scenarios $A$ with probability $p$, and $B$ with probability
     $1-p$. This is not necessary, as long as we assume that the only
     way to get non-determinism is due to latency, and our miniprotocols
     involve only deterministic computation, and *unique agency property*
     described by Marcin.
 
-## Estimates
-Note that we can define derived estimates of
-`LatencyDistribution`
-that somewhat approximate it:
-```haskell
-newtype Latest = Latest { unLatest :: Delay }
-  deriving (Eq, Ord, Show)
-latest :: LatencyDistribution -> Latest
-latest  = Latest . Delay . (-1+) . length . unSeries . prob
-onLatest = liftBinOp unLatest Latest
-
-newtype Earliest = Earliest { unEarliest :: Delay }
-  deriving (Eq, Ord, Show)
-earliest :: LatencyDistribution -> Earliest
-earliest [x]                             = Earliest 0
-earliest (last . unSeries . prob -> 0.0) = error "LatencyDistribution should always end with non-zero value"
-earliest  other                          = Earliest . Delay . (max 0) . length . takeWhile (0==) . unSeries . prob $ other
-
--- TODO: place for a lens?
-onEarliest = liftBinOp unEarliest Earliest
-
-instance TimeToCompletion Earliest where
-  firstToFinish = onEarliest min
-  lastToFinish  = onEarliest max
-  after         = onEarliest (+)
-  noDelay       = Earliest 0
-
-instance TimeToCompletion Latest where
-  firstToFinish = onLatest min
-  lastToFinish  = onLatest max
-  after         = onLatest (+)
-  noDelay       = Latest 0
-
+```{.hidden}
+-- __
 ```
-These estimates have the property that we can easily compute
-the same operations on estimates, without really computing
-the full `LatencyDistribution`.
 
-```{.haskell}
+We can encapsulate basic operations with `TimeToCompletion` class, describing
+interface that will be used both for `LatencyDistribution`s and their
+approximations:
+```{.haskell .literate}
 class TimeToCompletion ttc where
   firstToFinish :: ttc -> ttc -> ttc
   lastToFinish  :: ttc -> ttc -> ttc
   after         :: ttc -> ttc -> ttc
-  noDelay       :: ttc
-  {-# MINIMAL firstToFinish, lastToFinish, after, noDelay #-}
+  delay         :: Delay -> ttc
+  {-# MINIMAL firstToFinish, lastToFinish, after, delay #-}
   -- | Add explicit case/if to make correct estimate
   --   single pass instead of trace
 
@@ -398,18 +278,129 @@ instance TimeToCompletion LatencyDistribution where
   firstToFinish = firstToFinishLD
   lastToFinish  = lastToFinishLD
   after         = afterLD
-  noDelay       = noDelayLD
+  delay         = delayLD
+```
 
--- | Specify the functor with respect to TTC operations
+
+## Estimates
+
+Note that we can define bounds on `LatencyDistribution` that behave like functors
+over basic operations from `TimeToCompletion` class.
+
+* Upper bound on distribution is the `Latest` possible time:
+```{.haskell .literate}
+newtype Latest = Latest { unLatest :: Delay }
+  deriving (Eq, Ord, Show)
+
+latest :: LatencyDistribution -> Latest
+latest  = Latest . Delay . (-1+) . length . unSeries . prob
+
+onLatest = liftBinOp unLatest Latest
+
+instance TimeToCompletion Latest where
+  firstToFinish = onLatest min
+  lastToFinish  = onLatest max
+  after         = onLatest (+)
+  delay         = Latest
+```
+* Lower bound on distribution is the `Earliest` possible time:
+```{.haskell .literate}
+newtype Earliest = Earliest { unEarliest :: Delay }
+  deriving (Eq, Ord, Show)
+earliest :: LatencyDistribution -> Earliest
+earliest [x]                             = Earliest 0
+earliest (last . unSeries . prob -> 0.0) = error "Canonical LatencyDistribution should always end with non-zero value"
+earliest  other                          = Earliest . Delay . (max 0) . length . takeWhile (0==) . unSeries . prob $ other
+
+onEarliest = liftBinOp unEarliest Earliest
+
+instance TimeToCompletion Earliest where
+  firstToFinish = onEarliest min
+  lastToFinish  = onEarliest max
+  after         = onEarliest (+)
+  delay         = Earliest
+```
+
+These estimates have the property that we can easily compute
+the same operations on estimates, without really computing
+the full `LatencyDistribution`.
+
+```{.haskell}
+-- | Verify the functor with respect to TTC operations on `LatencyDistribution`s.
 verifyTTCFunctor compatible extract a b =
      (         (a `firstToFinish`         b) `compatible`
       (extract  a `firstToFinish` extract b)) &&
      (         (a `lastToFinish`          b) `compatible`
       (extract  a `lastToFinish`  extract b)) &&
      (         (a `after`                 b) `compatible`
-      (extract  a `after`         extract b)) &&
-                   noDelay                   `compatible` noDelay
+      (extract  a `after`         extract b))
+-- FIXME:                  delay                     `compatible` delay
 
+```
+
+
+## Verifying operations on distributions
+
+We already use the type class `TimeToCompletion` to verify
+bounds on distributions. Why not to use it that implementation
+of `LatencyDistribution` is consistent with simple simulations?
+We need additional basic operation: simulating a process with a given
+distribution.
+
+```{.haskell .literate}
+class TimeToCompletion ttc => Stochastic ttc where
+  stochasticProcess :: Statistics.ContGen d => d -> ttc
+```
+
+Now the simple simulation will just draw random delays for stochastic processes
+and give us a total delay:
+```{.haskell .literate}
+newtype Simulation = Simulation {
+    unSimulation :: (forall m. PrimMonad m => MWC.Gen (PrimState m) -> m Delay)
+  }
+
+instance TimeToCompletion Simulation where
+  firstToFinish = onSimulation max
+  lastToFinish  = onSimulation min
+  after         = onSimulation (+)
+  delay       t = Simulation $ const $ return t
+
+onSimulation :: (Delay      -> Delay      -> Delay)
+             ->  Simulation -> Simulation -> Simulation
+
+onSimulation op a b = Simulation $ \st -> op <$> unSimulation a st
+                                             <*> unSimulation b st
+
+instance Stochastic Simulation where
+  stochasticProcess d = Simulation sim
+    where
+      sim :: forall m. PrimMonad m => MWC.Gen (PrimState m) -> m Delay
+      sim st = roundDelay <$> Statistics.genContVar d st
+        where
+          roundDelay = Delay . fromEnum . toInteger . truncate
+
+```
+
+Now correctness of simulation is easy to see, so next we need to
+reconstruct distribution from simulation:
+
+```{.haskell .literate}
+sampleSimulation :: Int -> Simulation -> IO LatencyDistribution
+sampleSimulation numSamples (Simulation s) = histogram <$> do
+    MWC.withSystemRandom sample
+  where
+    sample st = replicateM numSamples (s st :: IO Delay)
+
+histogram :: [Delay] -> LatencyDistribution
+histogram ds = LatencyDistribution $ Series $ go (0, 0) ds
+  where
+    go (height, 0            ) []     = []
+    go (height, positiveCount) []     = [positiveCount]
+    go (height, count        ) (d:ds) =
+      if height == d
+         then   go (height, count+1) ds
+         else -- d>height
+              0:go (height+1, 0) (d:ds)
 ```
 
 # Representing networks
@@ -469,12 +460,14 @@ of multiplication (unit or one), and `bottom` is neutral element of addition.
 Note that both of these binary operators give also rise to two
 almost-scalar multiplication operators:
 ```{.haskell}
+scaleProbability :: Probability -> LatencyDistribution -> LatencyDistribution
 scaleProbability a = after $ attenuated a
-scaleDelay  :: Delay -> LatencyDistribution -> LatencyDistribution
-scaleDelay       t = after $ delay      t
 
-delay :: Delay -> LatencyDistribution
-delay n = LatencyDistribution
+scaleDelay  :: Delay -> LatencyDistribution -> LatencyDistribution
+scaleDelay       t = after $ delayLD    t
+
+delayLD :: Delay -> LatencyDistribution
+delayLD n = LatencyDistribution
         $ Series
         $ [0.0 | _ <- [(0::Delay)..n-1]] <> [1.0]
 ```
@@ -511,7 +504,7 @@ Also note that this series converges to $ΔQ$ on
 a single shortest path between each two nodes.
 That means that we may call this matrix $R_{min}(t)$,
 or optimal diffusion matrix.
-```haskell
+```{.haskell .literate}
 -- | This computes optimal connections on $\deltaQ{}$ matrix.
 --   TODO: Check that it works both for boolean matrices, and $\deltaQ{}$.
 optimalConnections a = fix step a
@@ -640,60 +633,32 @@ for reasonable amount of time,
 and everybody follows. Marcin made sure that nobody breaks the family
 glasses. Karl provided online source of temptations to delay release.
 
-# Glossary
+# Appendix: Validation and test case generation for latency distributions
 
-* $t∈\mathcal{T}$ - time since sending the message, or initiating a process
-* $∆Q(t)$ - response rate of a single connection after time $t$
-  (chance that message was received until time $t$)
-* $∆R(t)$ - completion rate of broadcast to entire network (rate of nodes
-  expected to have seen the result until time $t$)
-* $\epsilon{}$ - rate of packets that are either dropped or arrive after
-  latest reasonable deadline we chose
+Note that we assume that correct distribution is a list of at least one,
+and is devoid of superfluous trailing zeros beyond first index.
+Indexing starts at 0 (which means: no delay.)
+```{.haskell .literate}
+-- | Validity criteria for latency distributions
+isValidLD :: LatencyDistribution -> Bool
+isValidLD []            = False
+isValidLD [x]           = True -- any distribution with a single-element domain is valid (even one that delivers nothing)
+isValidLD (last . unSeries . prob -> 0.0) = False -- any distribution with more than one element and last element of zero is invalid (to prevent redundant representations.)
+isValidLD (prob -> probs) = (sum probs) <= 1.0 -- sum of probabilities shall never exceed 0.0
+                         && all isValidProbability probs -- each value must be valid value for probability
+```
 
-# Appendix: Missing definitions
-
-```{.haskell}
-(|*|) = undefined -- matrix multiplication
-frob = undefined -- Frobenius metric
-infixl 7 .* -- same precedence as *
--- | Scalar multiplication
-(.*):: Num a => a -> Series a -> Series a -- type declaration for .*
-c .* (Series (f:fs)) = Series (c*f : unSeries ( c.* Series fs)) -- definition of .*
-c .* (Series []    ) = Series []
--- | Convolution from McIlroy
-convolve :: Num a => Series a -> Series a -> Series a
-(Series (f:fs)) `convolve` gg@(Series (g:gs)) =
-  Series (f*g : unSeries (f .* Series gs + (Series fs `convolve` gg)))
-(Series []    ) `convolve` _                  =
-  Series []
-
-elementwise f (Series a) (Series b) = Series (go f a b)
+To convert possibly improper `LatencyDistribution` into its canonical representation:
+```{.haskell .literate}
+canonicalizeLD = assureAtLeastOneElement . dropTrailingZeros
   where
-    go f []        ys  = ( f  0.0) <$>        ys
-    go f xs      []    = (`f` 0.0) <$>     xs
-    go f (x:xs) (y:ys) = (x `f` y)  : go f xs ys
+    assureAtLeastOneElement []    = [0.0]
+    assureAtLeastOneElement other = other
+    dropTrailingZeros             = reverse . dropWhile (==0.0) . reverse
+```
 
-Series a .*. Series b = Series (zipWith (*) a b)
-
-instance Num a => Num (Series a) where
-  Series a + Series b = Series (go a b)
-    where
-      go    []     ys  = ys
-      go    xs     []  = xs
-      go (x:xs) (y:ys) = (x+y):go xs ys
-  (*) = convolve
-  abs = fmap abs
-  signum = fmap signum
-  fromInteger = undefined
-  negate = fmap negate
-
--- | Lift binary operator to newtype.
-liftBinOp unpack pack op a b = pack (unpack a `op` unpack b)
-
-instance Arbitrary Delay where
-  arbitrary = getNonNegative <$> arbitrary
-  shrink (Delay d) = Delay <$> shrinkIntegral d
-
+We use QuickCheck generate random distribution for testing:
+```{.haskell .literate}
 instance Arbitrary LatencyDistribution where
   arbitrary = sized $ \maxLen -> do
     actualLen <- choose (0, maxLen-1)
@@ -707,34 +672,48 @@ instance Arbitrary LatencyDistribution where
        else arbitrary
   shrink (unSeries . prob -> ls) = LatencyDistribution <$> Series <$> recursivelyShrink ls
 ```
-
-# Appendix: Power series
-
-Here we follow [@PowerSeries]:
-```haskell
--- | Put more code here...
-newtype Series a = Series { unSeries :: [a] }
-  deriving (Eq, Ord, Show)
-
--- | Cumulative sums computes sums of 1..n-th term of the series
-cumsum = Series . scanl (+) 0 . unSeries
--- | Subtractive remainders computes running remainders to 1.0 after summing up
---   all terms of the series up to a given position.
-subrem = Series . scanl (-) 1 . unSeries
-
---completion = undefined
-cut :: Delay -> Series a -> Series a
-cut (Delay t) (Series s) = Series (take t s)
-instance Functor Series where
-  fmap f (Series a) = Series (fmap f a)
-instance Foldable Series where
-  foldr f e (Series s) = foldr f e s
-instance Semigroup (Series a) where
-  Series a <> Series b = Series (a <> b)
-instance IsList (Series a) where
-  type Item (Series a) = a
-  fromList          = Series
-  toList (Series s) = s
+Equality uses lexicographic comparison, since that allows shortcut evaluation
+by the length of shorter distribution:
+```{.haskell .literate}
+instance Eq LatencyDistribution where
+  xs == ys = (lexCompare `on` (unSeries . prob)) xs ys == EQ
+    where
+      lexCompare :: [Probability] -> [Probability] -> Ordering
+      lexCompare  xs     []    = if all (==0.0) xs
+                                 then EQ
+                                 else LT
+      lexCompare  []     xs    = invertComparison $ lexCompare xs []
+      lexCompare (x:xs) (y:ys) = case compare x y of
+                                EQ    -> lexCompare xs ys
+                                other -> other
+      invertComparison LT = GT
+      invertComparison GT = LT
+      invertComparison EQ = EQ
 ```
 
-# Bibliography
+Below are convenience functions for easy entry and display of latency distributions:
+```{.haskell .literate}
+-- Allows usage of list syntax in place of distributions.
+-- Requires:
+-- `{-# LANGUAGE OverloadedLists #-}`
+-- `import GHC.Exts(IsList(..))`
+instance IsList LatencyDistribution where
+  type Item LatencyDistribution = Probability
+  fromList = LatencyDistribution . Series
+  toList   = unSeries . prob
+
+instance Show LatencyDistribution where
+  showsPrec _ ld s = "LatencyDistribution "++ showsPrec 0 (fmap unProb $ unSeries $ prob ld) s
+```
+
+# Appendix: Missing definitions
+
+We use lifting of binary operation to a new type with `liftBinOp` for `Earliest`
+and `Latest`:
+```{.haskell}
+-- | Lift binary operator to newtype.
+liftBinOp unpack pack op a b = pack (unpack a `op` unpack b)
+
+(|*|) = undefined -- matrix multiplication
+frob = undefined -- Frobenius metric
+```

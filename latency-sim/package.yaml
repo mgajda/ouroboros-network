@@ -27,10 +27,13 @@ library:
   ghc-options:
     - -pgmL markdown-unlit
   dependencies:
-    - markdown-unlit
     - time
     - QuickCheck
+    - primitive
     - statistics
+    - mwc-random
+  build-tools:
+    - markdown-unlit
 
 executables:
   hide-codeblocks:

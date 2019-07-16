@@ -1,0 +1,34 @@
+---
+author:
+  - Michał J. Gajda
+  - Karl      Knutsson
+  - Duncan    Coutts
+  - Marcin    Szamotulski
+title: Curious properties of latency distributions
+abstract: |
+  Network latency distributions, their algebra, and use examples.
+date: June 25 2019, v1.9
+input: markdown+tex_math_dollars+yaml_metadata_block+citations
+output:
+  pdf_document:
+    keep_tex: true
+    toc: true
+    toc_depth: 2
+    mainfont: "DejaVu Serif"
+    sansfont: Arial
+    latex_engine: xelatex
+bibliography:
+  - Latency.bib
+---
+
+# Glossary
+
+* $t∈\mathcal{T}$ - time since sending the message, or initiating a process
+* $∆Q(t)$ - response rate of a single connection after time $t$
+  (chance that message was received until time $t$)
+* $∆R(t)$ - completion rate of broadcast to entire network (rate of nodes
+  expected to have seen the result until time $t$)
+* $\epsilon{}$ - rate of packets that are either dropped or arrive after
+  latest reasonable deadline we chose
+
+# Bibliography

@@ -2,6 +2,9 @@
 {-# LANGUAGE OverloadedLists #-}
 module Latency.ApproximationsSpec(spec) where
 
+import Delay
+import Probability
+import Series
 import Latency
 
 import Test.QuickCheck

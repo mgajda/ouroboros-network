@@ -5,6 +5,8 @@ module Latency.ErlangSpec(spec, gamma, distributionSeries, exponential) where
 import Control.Exception(assert)
 import GHC.Exts(IsList(..))
 
+import Probability
+import Series
 import Latency
 
 import Test.QuickCheck
