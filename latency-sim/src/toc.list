@@ -1,5 +1,11 @@
 README.mmd
 Latency.md
-Series.md
+LatencyEstimates.md
+Simulation.md
+Network.md
+closure.mmd
 Delay.md
+Probability.md
+Series.md
+LatencySpec.md
 epilogue.mmd

@@ -28,3 +28,6 @@ ghc -pgmL markdown-unlit ${LATENCY}.lhs
 
 echo "Making .html"
 pandoc --filter=hide-codeblocks --mathml --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont=Arial --pdf-engine=xelatex ${INPUTS} -o ${NAME}.html --highlight-style=espresso
+
+echo "Checking for missing files in toc.list:"
+for i in *.md *.mmd; do grep $i toc.list>/dev/null || echo "Missing file in TOC: $i"; done

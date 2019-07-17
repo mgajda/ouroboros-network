@@ -1,0 +1,87 @@
+### Performance goals
+
+The *optimal network* performance can be reached for
+an active connection network that contains shortest path
+between each two nodes.
+We aim for a performance within fixed factor of this
+*optimal network*.
+
+_Note that optimal network is almost never just
+optimal spanning tree_
+We also want to set a reasonable *stabilization time bounds*
+before this performance goal is reached.
+
+### Relation to other plausible metrics
+
+One can imagine other key properties that network must satisfy:
+
+* That absent permanent failures, network will reach full connectivity.
+That corresponds to the situation where given ∆Q(t) iCDF ultimately reaches 100%
+delivery probabiliity for some delay, ∆R(t) will also always reach 100%.
+*Moreover ∆R(t) metric allows to put deadline for reaching full connectivity
+in a convenient way.*
+* That given a fixed limit on rate of nodes joining and leaving the network,
+we also will have deadline on when ∆R(t) reaches a fixed delivery rate $R_{SLA}$
+within deadline $t_{SLA}$.
+* That given conditions on minimum average quality of connections $∆Q(t)$,
+and fixed rate of adversary nodes $r_{adv}$ we can still guarantee networks
+reaches reachability $R_{SLA}$.
+* That there are conditions for which $∆R(t)$ always reaches almost optimal
+reachability defined by given ratio $o\in{}(0.9,1.0)$, such that
+$∆R(o*t) \ge max(∆R_{optimal}(t)/o)$.
+In other words: there is a deadline $o$-times longer than time to reach optimal
+reachability in an optimal network, we reach connectivity of no less than
+$o$-times connectivity of the optimal network.
+
+## What for capacity-limited networks?
+
+Our environment will compute maximum flow of messages sent between
+nodes at each point of time.
+Our proofs can also use constant bound on the number of messages
+sent between nodes at each step of the protocol.
+That should assure that our capacity-insensitive approximations
+stay valid for all networks that have significantly more capacity
+than used by the algorithm.
+
+# Schedule
+## Milestones proposed
+
+1. Possible metrics explored
+    * mathematical characterization
+    * implementation
+    * algebraic property exploration
+2. Comparison with other graph metrics
+3. Properties of the metric
+      * enumeration of desired or expected properties
+      * derive algebra of the chosen metric
+4. Implementation of the metric
+      * datatype for $∆Q(t)$ and $∆R(t)$.
+        and optimization of reduction of $∆Q(t)$
+        computation.
+      * computing $∆Q(t)$ and $∆R(t)$ curve for random network
+      connections.
+5. Comparison with other metrics used for graph and network research
+      * visualizing one or multiple distributions
+      * assertions about classical graph algorithms vs rates
+      * computing metrics random networks
+
+## Desired outcomes:
+* mathematical theory and statistical tool for modelling tool latencies
+  over high capacity networks
+* statistical assessments of these policies under adverse scenarios
+
+## Future plans:
+* proof that our policies are almost-optimal after convergence
+* expand the theory into capacity-limited networks
+* apply it to reason about latency of other protocols within Cardano
+* modelling a most adverse scenario [@ProgrammingSatan]
+
+
+# Acknowledgments
+
+Michał started writing, since the task seemed so easy to do within a month
+or two.
+Duncan made sure that discussion constructively proceeds
+for reasonable amount of time,
+and everybody follows. Marcin made sure that nobody breaks the family
+glasses. Karl provided online source of temptations to delay release.
