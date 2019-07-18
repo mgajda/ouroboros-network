@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE UnicodeSyntax     #-}
 {-# LANGUAGE ViewPatterns      #-}
-module Latency where
+module LatencyEstimates where
 
 import GHC.Exts(IsList(..))
 import Control.Monad.Primitive(PrimMonad(..))
@@ -23,6 +23,7 @@ import Probability
 import Delay
 import Series
 import Latency
+import LatencySpec() -- Arbitrary instance
 ```
 
 ## Bounds on distributions
@@ -30,7 +31,7 @@ import Latency
 Note that we can define bounds on `LatencyDistribution` that behave like functors
 over basic operations from `TimeToCompletion` class.
 
-* Upper bound on distribution is the `Latest` possible time:
+* Upper bound on distribution is the `Latest` possible time^[Here `liftBinOp` is for lifting an operator to a newtype.]:
 ```{.haskell .literate}
 newtype Latest = Latest { unLatest :: Delay }
   deriving (Eq, Ord, Show)
@@ -45,6 +46,7 @@ instance TimeToCompletion Latest where
   lastToFinish  = onLatest max
   after         = onLatest (+)
   delay         = Latest
+  allLost       = Latest maxBound -- TODO: is it clear, or use Maybe?
 ```
 * Lower bound on distribution is the `Earliest` possible time:
 ```{.haskell .literate}
@@ -62,6 +64,7 @@ instance TimeToCompletion Earliest where
   lastToFinish  = onEarliest max
   after         = onEarliest (+)
   delay         = Earliest
+  allLost       = Earliest maxBound -- TODO: is it clear?
 ```
 
 These estimates have the property that we can easily compute
@@ -79,4 +82,10 @@ verifyTTCFunctor compatible extract a b =
       (extract  a `after`         extract b))
 -- FIXME:                  delay                     `compatible` delay
 
+```
+
+```{.haskell .hidden.}
+-- | Lift binary operator to newtype.
+--   That should probably be in standard library, but is usually derived on newtypes.
+liftBinOp unpack pack op a b = pack (unpack a `op` unpack b)
 ```

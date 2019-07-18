@@ -8,6 +8,7 @@ import GHC.Exts(IsList(..))
 import Probability
 import Series
 import Latency
+import LatencySpec
 
 import Test.QuickCheck
 import Test.QuickCheck.All
@@ -55,4 +56,3 @@ spec = do
   it "Sum of two gammas is gamma with different shape parameter" $ property $
     \steps theta -> let g i = gamma steps i theta
                     in g 1 `firstToFinish` g 1 `shouldBe` g 2
-

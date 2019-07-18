@@ -1,3 +1,10 @@
+
+```{.haskell .hidden}
+module Network where
+
+import Latency
+```
+
 # Representing networks
 
 Adjacency matrix is classic representation of network graph,
@@ -108,3 +115,8 @@ any starting point $i$ for the duration of $n$ retransmissions.
 
 3. We need to consider further examples of how our metrics react
    to issues detected by typical graph algorithms.
+
+```{.haskell .literate}
+(|*|) = undefined -- matrix multiplication
+frob = undefined -- any reasonable metric on the matrix, like frobenius metric
+```

@@ -77,18 +77,3 @@ invertComparison LT = GT
 invertComparison GT = LT
 invertComparison EQ = EQ
 ```
-
-Below are convenience functions for easy entry and display of latency distributions:
-```{.haskell .literate}
--- Allows usage of list syntax in place of distributions.
--- Requires:
--- `{-# LANGUAGE OverloadedLists #-}`
--- `import GHC.Exts(IsList(..))`
-instance IsList LatencyDistribution where
-  type Item LatencyDistribution = Probability
-  fromList = LatencyDistribution . Series
-  toList   = unSeries . prob
-
-instance Show LatencyDistribution where
-  showsPrec _ ld s = "LatencyDistribution "++ showsPrec 0 (fmap unProb $ unSeries $ prob ld) s
-```

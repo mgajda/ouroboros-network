@@ -31,15 +31,22 @@ bibliography:
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE UnicodeSyntax     #-}
 {-# LANGUAGE ViewPatterns      #-}
-module Latency where
+module Latency(
+    Delay(..)
+  , start
+  , LatencyDistribution(..)
+  , TimeToCompletion   (..)
+  , (∧)
+  , (∨)
+  , attenuated
+  ) where
 
 import GHC.Exts(IsList(..))
-import Control.Monad.Primitive(PrimMonad(..))
 import Control.Monad(replicateM)
 import Data.Function(on)
 import Data.Semigroup
-import qualified Statistics.Distribution as Statistics(ContGen(..))
-import qualified System.Random.MWC as MWC(Gen, withSystemRandom)
+--import qualified Statistics.Distribution as Statistics(ContGen(..))
+--import qualified System.Random.MWC as MWC(Gen, withSystemRandom)
 import Test.QuickCheck
 
 import Probability
@@ -270,7 +277,10 @@ class TimeToCompletion ttc where
   lastToFinish  :: ttc -> ttc -> ttc
   after         :: ttc -> ttc -> ttc
   delay         :: Delay -> ttc
-  {-# MINIMAL firstToFinish, lastToFinish, after, delay #-}
+  allLost       :: ttc
+  noDelay       :: ttc
+  noDelay        = delay 0
+  {-# MINIMAL firstToFinish, lastToFinish, after, delay, allLost #-}
   -- | Add explicit case/if to make correct estimate
   --   single pass instead of trace
 
@@ -279,6 +289,8 @@ instance TimeToCompletion LatencyDistribution where
   lastToFinish  = lastToFinishLD
   after         = afterLD
   delay         = delayLD
+  allLost       = allLostLD
+  noDelay       = noDelayLD
 ```
 ### General treatment of completion distribution over time
 
@@ -312,12 +324,17 @@ delayLD n = LatencyDistribution
 
 # Appendix? Missing definitions
 
-We use lifting of binary operation to a new type with `liftBinOp` for `Earliest`
-and `Latest`:
-```{.haskell}
--- | Lift binary operator to newtype.
-liftBinOp unpack pack op a b = pack (unpack a `op` unpack b)
+Below are convenience functions for easy entry and display of latency distributions:
+```{.haskell .literate}
+-- Allows usage of list syntax in place of distributions.
+-- Requires:
+-- `{-# LANGUAGE OverloadedLists #-}`
+-- `import GHC.Exts(IsList(..))`
+instance IsList LatencyDistribution where
+  type Item LatencyDistribution = Probability
+  fromList = LatencyDistribution . Series
+  toList   = unSeries . prob
 
-(|*|) = undefined -- matrix multiplication
-frob = undefined -- Frobenius metric
+instance Show LatencyDistribution where
+  showsPrec _ ld s = "LatencyDistribution "++ showsPrec 0 (fmap unProb $ unSeries $ prob ld) s
 ```

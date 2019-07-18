@@ -1,3 +1,17 @@
+```{.haskell .hidden}
+{-# LANGUAGE RankNTypes #-}
+module Simulation where
+
+import Control.Monad.Primitive(PrimMonad(..))
+import Control.Monad(replicateM)
+import GHC.Exts(IsList(..))
+import qualified Statistics.Distribution as Statistics
+import qualified System.Random.MWC as MWC(Gen, withSystemRandom)
+
+import Probability
+import Latency
+```
+
 ## Verifying operations on distributions
 
 We already use the type class `TimeToCompletion` to verify
@@ -41,18 +55,23 @@ instance Stochastic Simulation where
 
 ```
 
-Now correctness of simulation is easy to see, so next we need to
-reconstruct distribution from simulation:
+Correctness of simulation lies on the assumption that we
+can draw a random time for process once in simulation,
+then operations are trivially implemented as minimum time, maximum time,
+or addition of times for sequential composition.
+
+Next we need to reconstruct distribution from multiple runs of simulation:
 
 ```{.haskell .literate}
 sampleSimulation :: Int -> Simulation -> IO LatencyDistribution
-sampleSimulation numSamples (Simulation s) = histogram <$> do
+sampleSimulation numSamples (Simulation s) = histogram <$>
     MWC.withSystemRandom sampler
   where
+    sampler :: MWC.Gen (PrimState IO) -> IO [Delay]
     sampler st = replicateM numSamples (s st :: IO Delay)
 
 histogram :: [Delay] -> LatencyDistribution
-histogram = LatencyDistribution . Series . go (0, 0)
+histogram = fromList . go (0, 0)
   where
     go (height, 0            ) []     = []
     go (_,      positiveCount) []     = [positiveCount]

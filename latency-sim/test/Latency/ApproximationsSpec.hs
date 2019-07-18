@@ -1,11 +1,14 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 module Latency.ApproximationsSpec(spec) where
 
 import Delay
 import Probability
 import Series
 import Latency
+import LatencySpec
+import LatencyEstimates
 
 import Test.QuickCheck
 import Test.QuickCheck.All
@@ -33,14 +36,14 @@ spec = do
              it "earliest of n element series of non-zero elements is always zero" $
                property $ \(Positive x) (Positive n) -> earliest (fromList $ replicate n x) == Earliest 0
              skip $ it "earliest of allLost is 0" $ do
-               earliest allLostLD == Earliest 0
+               earliest (allLost @LatencyDistribution) == Earliest 0
              it "earliest of delay t is t" $ do
                property $ \t -> earliest (delay t) == Earliest (t :: Delay)
            describe "TTC ops on latest" $ do
              it "latest of noDelay is 0" $ do
                latest [1] == Latest 0
              skip $ it "Latest of allLost is 0" $ do
-               latest allLostLD == Latest 0
+               latest (allLost @LatencyDistribution) == Latest 0
              it "latest of [0.0] is 0" $ do
                latest [0.0] == Latest 0
              it "latest of delay t is t" $ do
@@ -58,5 +61,3 @@ spec = do
 earliestIsTTCFunctor = property $ verifyTTCFunctor (\a b -> earliest a == b) earliest
 
 latestIsTTCFunctor   = property $ verifyTTCFunctor (\a b -> latest   a == b) latest
-
-
