@@ -21,17 +21,18 @@ description:         Please see the README on GitHub at <https://github.com/mgaj
 
 dependencies:
 - base >= 4.7 && < 5
+ghc-options:
+- -pgmL markdown-unlit
 
 library:
   source-dirs: src
-  ghc-options:
-    - -pgmL markdown-unlit
   dependencies:
     - time
     - QuickCheck
     - primitive
     - statistics
     - mwc-random
+    - hspec
   build-tools:
     - markdown-unlit
 

@@ -31,3 +31,5 @@ pandoc --filter=hide-codeblocks --mathml --from=${FORMAT} --variable mainfont="D
 
 echo "Checking for missing files in toc.list:"
 for i in *.md *.mmd; do grep $i toc.list>/dev/null || echo "Missing file in TOC: $i"; done
+for i in ../test/*.md ../test/*.mmd; do grep $i toc.list>/dev/null || echo "Missing file in TOC: $i"; done
+

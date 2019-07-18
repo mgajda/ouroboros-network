@@ -15,6 +15,8 @@ import Latency
 import Test.QuickCheck.Gen(sized, choose)
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Modifiers
+
+import Test.Hspec.QuickCheck
 ```
 
 # Appendix: Validation and test case generation for latency distributions
@@ -76,4 +78,8 @@ lexCompare (x:xs) (y:ys) = case compare x y of
 invertComparison LT = GT
 invertComparison GT = LT
 invertComparison EQ = EQ
+```
+
+```{.haskell .literate}
+spec = prop "Arbitrary instance generates valid LatencyDistribution" isValidLD
 ```

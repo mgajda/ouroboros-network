@@ -23,7 +23,7 @@ import Probability
 import Delay
 import Series
 import Latency
-import LatencySpec() -- Arbitrary instance
+--import LatencySpec() -- Arbitrary instance
 ```
 
 ## Bounds on distributions

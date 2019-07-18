@@ -2,10 +2,11 @@ README.mmd
 Latency.md
 LatencyEstimates.md
 Simulation.md
+../test/SimulationSpec.md
 Network.md
 closure.mmd
 Delay.md
 Probability.md
 Series.md
-LatencySpec.md
+../test/LatencySpec.md
 epilogue.mmd

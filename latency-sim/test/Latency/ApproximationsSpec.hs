@@ -7,7 +7,7 @@ import Delay
 import Probability
 import Series
 import Latency
-import LatencySpec
+import LatencySpec hiding(spec)
 import LatencyEstimates
 
 import Test.QuickCheck
