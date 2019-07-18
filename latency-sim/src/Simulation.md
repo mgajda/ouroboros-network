@@ -2,14 +2,16 @@
 {-# LANGUAGE RankNTypes #-}
 module Simulation where
 
-import Control.Monad.Primitive(PrimMonad(..))
-import Control.Monad(replicateM)
-import GHC.Exts(IsList(..))
-import qualified Statistics.Distribution as Statistics
-import qualified System.Random.MWC as MWC(Gen, withSystemRandom)
+import           Control.Monad.Primitive(PrimMonad(..))
+import           Control.Monad(replicateM)
+import           Control.Monad.ST
+import           Data.List(sort)
+import           GHC.Exts(IsList(..))
+import qualified Statistics.Distribution             as Statistics
+import qualified System.Random.MWC as MWC(Gen, GenST, withSystemRandom, asGenST)
 
-import Probability
-import Latency
+import           Probability
+import           Latency
 ```
 
 ## Verifying operations on distributions
@@ -22,14 +24,14 @@ distribution.
 
 ```{.haskell .literate}
 class TimeToCompletion ttc => Stochastic ttc where
-  stochasticProcess :: Statistics.ContGen d => d -> ttc
+  fromDistribution :: Statistics.ContGen d => d -> ttc
 ```
 
 Now the simple simulation will just draw random delays for stochastic processes
 and give us a total delay:
 ```{.haskell .literate}
 newtype Simulation = Simulation {
-    unSimulation :: (forall m. PrimMonad m => MWC.Gen (PrimState m) -> m Delay)
+    unSimulation :: forall s. MWC.GenST s -> ST s Delay
   }
 
 instance TimeToCompletion Simulation where
@@ -37,15 +39,18 @@ instance TimeToCompletion Simulation where
   lastToFinish  = onSimulation min
   after         = onSimulation (+)
   delay       t = Simulation $ const $ return t
+  allLost       = Simulation $ const $ return maxBound
 
 onSimulation :: (Delay      -> Delay      -> Delay)
              ->  Simulation -> Simulation -> Simulation
 
 onSimulation op a b = Simulation $ \st -> op <$> unSimulation a st
                                              <*> unSimulation b st
-
+```
+Key part is generating a process of length with a given random distribution:
+```{.haskell .literate}
 instance Stochastic Simulation where
-  stochasticProcess d = Simulation sim
+  fromDistribution d = Simulation sim
     where
       sim :: forall m. PrimMonad m => MWC.Gen (PrimState m) -> m Delay
       sim st = roundDelay <$> Statistics.genContVar d st
@@ -60,24 +65,45 @@ can draw a random time for process once in simulation,
 then operations are trivially implemented as minimum time, maximum time,
 or addition of times for sequential composition.
 
-Next we need to reconstruct distribution from multiple runs of simulation:
+## Reconstructing the distribution from simulation
 
+We need to sample `Simulation` a number of times to get a histogram.
 ```{.haskell .literate}
-sampleSimulation :: Int -> Simulation -> IO LatencyDistribution
-sampleSimulation numSamples (Simulation s) = histogram <$>
-    MWC.withSystemRandom sampler
+sampleSimulation' :: Int -> Simulation -> IO LatencyDistribution
+sampleSimulation' numSamples (Simulation s) = histogram <$>
+    (MWC.withSystemRandom . MWC.asGenST $ sampler)
   where
-    sampler :: MWC.Gen (PrimState IO) -> IO [Delay]
-    sampler st = replicateM numSamples (s st :: IO Delay)
+    sampler :: forall s. MWC.GenST s -> ST s [Delay]
+    sampler st = replicateM numSamples $ s st -- :: ST s Delay)
 
+sampleSimulation = sampleSimulation' 1000000
+```
+To build the histogram, we sort and count delays from the list of samples:
+```{.haskell .literate}
 histogram :: [Delay] -> LatencyDistribution
-histogram = fromList . go (0, 0)
+histogram = fromList . scale . go (0, 0) . sort
   where
+    scale l = fmap (/sum l) l
     go (height, 0            ) []     = []
     go (_,      positiveCount) []     = [positiveCount]
     go (height, count        ) (d:ds) =
       if height == d
          then   go (height, count+1) ds
          else -- d>height
-              0:go (height+1, 0) (d:ds)
+              count:go (height+1, 0) (d:ds)
+```
+To compare distributions we compute euclidean distance between their histograms:
+```{.haskell .literate}
+LatencyDistribution l `distance` LatencyDistribution m =
+  unProb $ sum $ fmap (^2) $ l-m
+```
+
+Choosing `0.001` as similarity threshold (should depend on number of samples)
+```{.haskell .literate}
+a `similar` b = distance a b < 0.001
+```
+Now we can compare simulations too:
+```{.haskell .literate}
+s `similarByDistribution` t = similar <$> sampleSimulation s
+                                      <*> sampleSimulation t
 ```

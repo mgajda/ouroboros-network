@@ -53,6 +53,8 @@ oldGamma steps k theta = LatencyDistribution $ Series (Prob <$> take steps (gamm
 
 spec = do
   it "Truthy" $ property $ True `shouldBe` True
-  it "Sum of two gammas is gamma with different shape parameter" $ property $
-    \steps theta -> let g i = gamma steps i theta
-                    in g 1 `firstToFinish` g 1 `shouldBe` g 2
+  prop "Sum of two gammas is gamma with different shape parameter" erlangSum
+
+erlangSum (Positive steps) (Positive theta) =
+    let g i = gamma steps i theta
+    in g 1 `firstToFinish` g 1 `shouldBe` g 2

@@ -52,7 +52,13 @@ newtype Series a = Series { unSeries :: [a] }
 
 -- | Cumulative sums computes sums of 1..n-th term of the series
 cumsum :: Num a => Series a -> Series a
-cumsum = Series . scanl (+) 0 . unSeries
+cumsum = Series . tail . scanl (+) 0 . unSeries
+
+-- | Series of discrete differences (assuming there was fake zero before the series,
+--   to preserve information about first term.)
+diff :: Num a => Series a -> Series a
+diff (Series []) = Series []
+diff (Series s ) = Series $ head s : zipWith (-) (tail s) s
 
 -- | Subtractive remainders computes running remainders to 1.0 after summing up
 --   all terms of the series up to a given position.
