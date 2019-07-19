@@ -13,7 +13,7 @@ echo "Making hide-codeblocks filter"
 stack install # for `hide-codeblocks`
 
 echo "Making TEX"
-pandoc --filter=pandoc-citeproc --filter=hide-codeblocks --natbib --from=${FORMAT} --standalone --variable mainfont="DejaVu Serif" --variable sansfont=Arial --to=latex --pdf-engine=xelatex ${INPUTS} -o ${NAME}.tex --csl="chicago-fullnote-bibliography.csl" --bibliography=Latency.bib
+pandoc --filter=pandoc-citeproc --filter=hide-codeblocks --natbib --from=${FORMAT} --standalone --variable mainfont="DejaVu Serif" --variable sansfont=Arial --to=latex --pdf-engine=xelatex ${INPUTS} -o ${NAME}.tex --bibliography=Latency.bib
 #--filter=pandoc-citeproc --biblio=Latency.bib
 
 echo "Making PDF"

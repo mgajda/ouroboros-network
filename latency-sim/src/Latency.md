@@ -14,8 +14,6 @@ output:
     keep_tex: true
     toc: true
     toc_depth: 2
-    mainfont: "DejaVu Serif"
-    sansfont: Arial
     latex_engine: xelatex
 bibliography:
   - Latency.bib
@@ -65,9 +63,9 @@ of time:
 
 <center>
 
-![Completion rate against deadline](completion-rate.png "Completion rate against deadline"){.center} \
+![Completion rate against deadline](../doc/completion-rate.png "Completion rate against deadline"){.center} \
 
-![Latency distribution](latency-distribution.png "Latency distribution"){.center}\
+![Latency distribution](../doc/latency-distribution.png "Latency distribution"){.center}\
 
 </center>
 

@@ -14,8 +14,6 @@ output:
     keep_tex: true
     toc: true
     toc_depth: 2
-    mainfont: "DejaVu Serif"
-    sansfont: Arial
     latex_engine: xelatex
 bibliography:
   - Latency.bib
