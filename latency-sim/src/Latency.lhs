@@ -204,6 +204,7 @@ allLostLD = attenuated 0.0
 noDelayLD = attenuated 1.0
 ```
 Here:
+
 - `allLost` indicates that no message arrives ever through this connection
 - `noDelay` indicates that the all messages always arrive without delay
 
@@ -225,14 +226,12 @@ corresponding improper CDF of message arrival.
 ```{.haskell .literate}
 failover deadline rdTry rdCatch =
     LatencyDistribution {
-      --  deadline = deadline rdTry
-      --           + deadline rdCatch
         prob     = initial <> fmap (remainder*) (prob rdCatch)
     }
   where
     initial :: Series Probability
     initial = cut deadline $ prob rdTry
-    -- | Subtractive remainder of the accepted part of time-to-complete:
+    -- | Remainder of distribution for all initial values
     remainder :: Probability
     remainder = 1 - sum initial
 ```
@@ -260,7 +259,7 @@ failover deadline rdTry rdCatch =
    $$A<t>\text{fail}=A$$
    $$\text{fail}<t>A=A$$
 
-6. Predictive Network Solutions (Neil and Peter) proposed using operator
+6. [Predictive Network Solutions (Neil and Peter)](http://www.pnsol.com) proposed using operator
     $A⇆_{p} B$ for probabilistic
     choice between scenarios $A$ with probability $p$, and $B$ with probability
     $1-p$. This is not necessary, as long as we assume that the only

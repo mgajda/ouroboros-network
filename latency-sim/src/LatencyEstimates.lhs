@@ -23,7 +23,6 @@ import Probability
 import Delay
 import Series
 import Latency
---import LatencySpec() -- Arbitrary instance
 ```
 
 ## Bounds on distributions
@@ -84,7 +83,7 @@ verifyTTCFunctor compatible extract a b =
 
 ```
 
-```{.haskell .hidden.}
+```{.haskell .hidden}
 -- | Lift binary operator to newtype.
 --   That should probably be in standard library, but is usually derived on newtypes.
 liftBinOp unpack pack op a b = pack (unpack a `op` unpack b)
