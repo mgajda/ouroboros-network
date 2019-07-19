@@ -76,7 +76,7 @@ sampleSimulation' numSamples (Simulation s) = histogram <$>
     sampler :: forall s. MWC.GenST s -> ST s [Delay]
     sampler st = replicateM numSamples $ s st -- :: ST s Delay)
 
-sampleSimulation = sampleSimulation' 1000000
+sampleSimulation = sampleSimulation' 10000
 ```
 To build the histogram, we sort and count delays from the list of samples:
 ```{.haskell .literate}

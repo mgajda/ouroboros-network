@@ -34,8 +34,6 @@ module Latency(
   , start
   , LatencyDistribution(..)
   , TimeToCompletion   (..)
-  , (∧)
-  , (∨)
   , attenuated
   ) where
 
@@ -183,8 +181,6 @@ rd1 `firstToFinishLD` rd2 = LatencyDistribution {
      prob     = prob rd1  +  prob rd2
               - prob rd1 .*. prob rd2
   }
-(∨) :: TimeToCompletion ttc => ttc -> ttc -> ttc
-(∨) = firstToFinish
 ```
 Now let's define neutral elements of both operations above:
 ```{.haskell}
@@ -207,8 +203,6 @@ rd1 `lastToFinishLD` rd2 = LatencyDistribution {
   where
     cdf1 = cumsum $ prob rd1
     cdf2 = cumsum $ prob rd2
-(∧) :: TimeToCompletion ttc => ttc -> ttc -> ttc
-(∧)=lastToFinish
 ```
 
 Now we can make an abstract interpretation of protocol code to derive
