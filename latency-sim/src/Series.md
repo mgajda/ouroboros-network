@@ -35,6 +35,9 @@ import GHC.Exts(IsList(..))
 import Data.Semigroup
 
 import Delay
+
+import Test.QuickCheck
+import Test.QuickCheck.All
 ```
 
 # Appendix: Power series representing distributions
@@ -58,22 +61,30 @@ f_t = Series [a0, a1, ..., an]
 ```{.haskell .literate}
 -- | Cumulative sums computes sums of 1..n-th term of the series
 cumsum :: Num a => Series a -> Series a
-cumsum = Series . tail . scanl (+) 0 . unSeries
+cumsum = Series
+       . tail -- drop uninformative zero at the beginning of result
+       . scanl (+) 0
+       . unSeries
 
--- | Series of discrete differences (assuming there was fake zero before the series,
---   to preserve information about first term.)
-diff :: Num a => Series a -> Series a
-diff (Series []) = Series []
-diff (Series s ) = Series $ head s : zipWith (-) (tail s) s
+-- | Differential encoding is lossless
+--   correspondent of discrete differences, but with
+--   first coefficient being copied.
+--   (Like there was fake zero before the series,
+--    to preserve information about first term.)
+--
+--   That makes it an inverse of `cumsum`.
+diffEnc :: Num a => Series a -> Series a
+diffEnc (Series []) = Series []
+diffEnc (Series s ) = Series $ head s : zipWith (-) (tail s) s
 ```
 This serves to get cumulants:
-```{.example}
-> cumsum [1,1,1] == [1,2,3]
-> cumsum [1,2,3] == [1,3,6]
-> cumsum (diff   x) == x
-> diff   (cumsum x) == x
+```{.haskell .literate .ignored}
+test_simpleCumsum  = cumsum [1,1,1] == ([1,2,3] :: Series Int)
+test_simpleCumsum2 = cumsum [1,2,3] == ([1,3,6] :: Series Int)
+test_cumsumIsLeftAdjointOfDiffEnc  x = cumsum  (diffEnc x) == x
+test_cumsumIsRightAdjointOfDiffEnc x = diffEnc (cumsum  x) == x
 ```
-So that `diff` of CDF will get PDF,
+So that `diffEnc` of CDF will get PDF,
 and `cumsum` of PDF will get CDF.
 ```{.haskell .hidden}
 -- | Subtractive remainders computes running remainders to 1.0 after summing up
@@ -155,4 +166,8 @@ instance Num a => Num (Series a) where
   signum = fmap signum
   fromInteger = error "Do not use fromInteger on Series!!!"
   negate = fmap negate
+```
+
+```{.haskell .literate .hidden}
+spec = quickCheckAll
 ```

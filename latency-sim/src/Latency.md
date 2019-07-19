@@ -94,15 +94,17 @@ Below is Haskell specification of this datatype:
 ```{.haskell .literate}
 newtype LatencyDistribution =
   LatencyDistribution {
-    -- | Monotonically growing like any CDF. May not reach 1.
     prob :: Series Probability
   }
 ```
+The representation above holds PDF (probability density function).
 Its cumulative distribution function can be trivially computed with running sum:
 ```
 cdf :: LatencyDistribution -> Series Probability
 cdf = cumsum . prob
 ```
+(There is inverse operation of differential encoding `diffEnc` in the [`Series`
+ module](#series), to recover PDF from CDF.)
 
 For ease of implementation, we express each function as a series of values
 for [discrete delays](#delay). First value is for *no delay*.
@@ -175,13 +177,24 @@ $ΔQ(t)=ΔQ_1(t)\mathbf{∨} ΔQ_2(t)$.
 Here is the Haskell code for naive definition of these two operations:
 We can also introduce alternative of two completion distributions.
 It corresponds to a an event that is earliest possible conclusion of one
-of two alternative events:
+of two alternative events.
+
+That can be easily expressed with improper cumulative distribution functions:
+$$ \text{P}_{min(a,b)}(x \leq t)= 1-(1-P_a(x\leq t)) * (1-P_b(x\leq t))$$
+That is, event $min(a,b)$ occured when $t<a$ or $t<b$, when:
+
+* it **did not occur** (top complement: $1-...$), that:
+    *  either $a$ did **not** occur $1-P_a(x≤t)$,
+    *  and $b$ did **not** occur $1-P_b(x≤t)$:
 ```{.haskell}
 rd1 `firstToFinishLD` rd2 = LatencyDistribution {
-     prob     = prob rd1  +  prob rd2
-              - prob rd1 .*. prob rd2
+     prob     = diffEnc
+              $ complement
+              $ complement (cumsum $ prob rd1) .*.
+                complement (cumsum $ prob rd2)
   }
 ```
+
 Now let's define neutral elements of both operations above:
 ```{.haskell}
 attenuated a = LatencyDistribution {
@@ -196,13 +209,12 @@ Here:
 
 3. Conjunction of two different actions simultaneously completed in parallel, and waits
 until they both are:
+$$ \text{P}_{max(a,b)}(x \leq t)= P_a(x\leq t) * P_b(x\leq t)$$
 ```{.haskell}
 rd1 `lastToFinishLD` rd2 = LatencyDistribution {
-    prob = prob rd1 .*. cdf2 + prob rd2 .*. cdf1 - prob rd1 .*. prob rd2
+    prob = diffEnc
+         $ cumsum (prob rd1) .*. cumsum (prob rd2)
   }
-  where
-    cdf1 = cumsum $ prob rd1
-    cdf2 = cumsum $ prob rd2
 ```
 
 Now we can make an abstract interpretation of protocol code to derive
@@ -301,7 +313,7 @@ of multiplication (unit or one), and `bottom` is neutral element of addition.
 ^[This field definition will be used for multiplication of connection matrices.]
 Note that both of these binary operators give also rise to two
 almost-scalar multiplication operators:
-```{.haskell}
+```{.haskell .literate}
 scaleProbability :: Probability -> LatencyDistribution -> LatencyDistribution
 scaleProbability a = after $ attenuated a
 
@@ -314,10 +326,9 @@ delayLD n = LatencyDistribution
         $ [0.0 | _ <- [(0::Delay)..n-1]] <> [1.0]
 ```
 
-# Appendix? Missing definitions
+```{.haskell .hidden}
+-- Below are convenience functions for easy entry and display of latency distributions:
 
-Below are convenience functions for easy entry and display of latency distributions:
-```{.haskell .literate}
 -- Allows usage of list syntax in place of distributions.
 -- Requires:
 -- `{-# LANGUAGE OverloadedLists #-}`
@@ -329,4 +340,7 @@ instance IsList LatencyDistribution where
 
 instance Show LatencyDistribution where
   showsPrec _ ld s = "LatencyDistribution "++ showsPrec 0 (fmap unProb $ unSeries $ prob ld) s
+
+complement :: Series Probability -> Series Probability
+complement = fmap (1.0-)
 ```
