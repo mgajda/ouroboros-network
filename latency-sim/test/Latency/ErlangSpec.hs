@@ -6,7 +6,7 @@ import Control.Exception(assert)
 import GHC.Exts(IsList(..))
 
 import Probability
-import Series
+import Series hiding(spec)
 import Latency
 import LatencySpec hiding(spec)
 

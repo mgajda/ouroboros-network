@@ -5,7 +5,7 @@ module Latency.ApproximationsSpec(spec) where
 
 import Delay
 import Probability
-import Series
+import Series hiding(spec)
 import Latency
 import LatencySpec hiding(spec)
 import LatencyEstimates

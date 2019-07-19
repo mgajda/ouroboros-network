@@ -35,7 +35,10 @@ library:
     - hspec
   build-tools:
     - markdown-unlit
+    - pandoc
+    - pandoc-citeproc
 
+# This is a build tool for documentation - a pandoc filter.
 executables:
   hide-codeblocks:
     main:                hide-codeblocks.hs

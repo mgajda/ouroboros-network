@@ -20,12 +20,12 @@ pandoc --filter=pandoc-citeproc --filter=hide-codeblocks --natbib --from=${FORMA
 echo "Making PDF"
 pandoc --filter=hide-codeblocks --filter=pandoc-citeproc          --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable  sansfont="DejaVu Sans" --pdf-engine=xelatex ${INPUTS} -o ${NAME}.pdf
 
-echo "Linking .lhs"
+#echo "Linking .lhs"
 #pandoc --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont="DejaVu Sans" --pdf-engine=xelatex ${INPUTS} --to rst+literate_haskell -o ${NAME}.lhs
-mln -s -p -g '*.md' '#1.lhs' >/dev/null || true
+#mln -s -p -g '*.md' '#1.lhs' >/dev/null || true
 
 echo "Interpreting .lhs"
-ghc -pgmL markdown-unlit ${LATENCY}.lhs
+ghc -pgmL markdown-unlit *.lhs ../*.lhs
 
 echo "Making .html"
 pandoc --filter=hide-codeblocks --mathml --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont=Arial --pdf-engine=xelatex ${INPUTS} -o ${NAME}.html --highlight-style=espresso

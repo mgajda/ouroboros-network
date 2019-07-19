@@ -53,12 +53,12 @@ spec = do
       length (unSeries s) >= 1 ==>
         first (cumsum s) == first (s :: Series Int)
     prop "cumulative sum is left adjoint of discrete differences" $
-      \s -> cumsum (diff  s) == (s :: Series Integer)
+      \s -> cumsum (diffEnc  s) == (s :: Series Integer)
     prop "cumulative sum after prepending zero is of left adjoint of discrete differences on non-null series" $
-      \s -> length (unSeries s) > 0 ==> cumsum (diff  (Series $ 0:unSeries s))
+      \s -> length (unSeries s) > 0 ==> cumsum (diffEnc  (Series $ 0:unSeries s))
          == (Series $ (0::Int):unSeries s)
     prop "cumulative sum is of right adjoint of discrete differences" $
-      \s -> diff (cumsum s) == (s :: Series Int)
+      \s -> diffEnc (cumsum s) == (s :: Series Int)
   describe "cut" $ do
     prop "length after cut is minimum of input length and series length" $
       \t s -> length (cut t s) == unDelay t `min` length (s :: Series Int)
