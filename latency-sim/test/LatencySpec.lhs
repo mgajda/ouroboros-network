@@ -16,7 +16,8 @@ import Test.QuickCheck.Gen(sized, choose)
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Modifiers
 
-import Test.Hspec.QuickCheck
+import Test.Hspec.QuickCheck(prop)
+import Test.Hspec(describe, it, shouldBe)
 ```
 
 # Appendix: Validation and test case generation for latency distributions
@@ -81,5 +82,10 @@ invertComparison EQ = EQ
 ```
 
 ```{.haskell .literate}
-spec = prop "Arbitrary instance generates valid LatencyDistribution" isValidLD
+spec = describe "Arbitrary instance for LatencyDistributions" $ do
+         prop "generates result that passes validLD" $ \x -> isValidLD x `shouldBe` True
+         it "[0.0, 0.0] is not valid" $ isValidLD [0.0, 0.0] `shouldBe` False
+         it "[1.0] is valid" $ isValidLD [1.0] `shouldBe` True
+         it "[0.0,1.0] is valid" $ isValidLD [0.0, 1.0] `shouldBe` True
+         it "[1.0,0.0] is not valid" $ isValidLD [1.0, 0.0] `shouldBe` False
 ```

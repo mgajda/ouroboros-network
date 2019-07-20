@@ -18,11 +18,13 @@ import Data.Semigroup
 import qualified Statistics.Distribution as Statistics(ContGen(..))
 import qualified System.Random.MWC as MWC(Gen, withSystemRandom)
 import Test.QuickCheck
+import Test.Hspec(describe, SpecWith)
+import Test.Hspec.QuickCheck(prop)
 
 import Probability
 import Delay
 import Series
-import Latency
+import Latency as L
 ```
 
 ## Bounds on distributions
@@ -36,7 +38,8 @@ newtype Latest = Latest { unLatest :: Delay }
   deriving (Eq, Ord, Show)
 
 latest :: LatencyDistribution -> Latest
-latest  = Latest . Delay . (-1+) . length . unSeries . prob
+latest [0.0] = Latest maxBound
+latest  x    = Latest . Delay . (-1+) . length . unSeries . prob $ x
 
 onLatest = liftBinOp unLatest Latest
 
@@ -52,6 +55,7 @@ instance TimeToCompletion Latest where
 newtype Earliest = Earliest { unEarliest :: Delay }
   deriving (Eq, Ord, Show)
 earliest :: LatencyDistribution -> Earliest
+earliest [0.0]                           = Earliest maxBound
 earliest [_]                             = Earliest 0
 earliest (last . unSeries . prob -> 0.0) = error "Canonical LatencyDistribution should always end with non-zero value"
 earliest  other                          = Earliest . Delay . (max 0) . length . takeWhile (0==) . unSeries . prob $ other
@@ -69,19 +73,6 @@ instance TimeToCompletion Earliest where
 These estimates have the property that we can easily compute
 the same operations on estimates, without really computing
 the full `LatencyDistribution`.
-
-```{.haskell .literate}
--- | Verify the functor with respect to TTC operations on `LatencyDistribution`s.
-verifyTTCFunctor compatible extract a b =
-     (         (a `firstToFinish`         b) `compatible`
-      (extract  a `firstToFinish` extract b)) &&
-     (         (a `lastToFinish`          b) `compatible`
-      (extract  a `lastToFinish`  extract b)) &&
-     (         (a `after`                 b) `compatible`
-      (extract  a `after`         extract b))
--- FIXME:                  delay                     `compatible` delay
-
-```
 
 ```{.haskell .hidden}
 -- | Lift binary operator to newtype.
