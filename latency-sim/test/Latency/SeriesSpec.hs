@@ -68,8 +68,13 @@ spec = do
     prop "scaling is distributive over fmap" $
       \a b (NonZero s) -> s.*(a+b) == (s.*a)+ (s.*(b ::Series Integer))
     prop "sum has the length of longest argument" $
-        \a b -> size ((a::Series Int) + b) == max (size a) (size b)
-
-size = length . unSeries
+        \a b -> length ((a::Series Int) + b) == max (length a) (length b)
+  describe "extension" $ do
+    prop "results of extension have the same length" $ \a b ->
+      let (a', b') = extendToSameLength (a::Series Double, b::Series Double)
+      in length a' `shouldBe` length b'
+    prop "results of extension have the length of longer" $ \a b ->
+      let (a', b') = extendToSameLength (a::Series Double, a <> b::Series Double)
+      in length a' `shouldBe` (length a + length b)
 
 unDelay (Delay d) = d
