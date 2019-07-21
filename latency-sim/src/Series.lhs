@@ -23,6 +23,7 @@ bibliography:
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiWayIf        #-}
 {-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE TypeFamilies      #-}
@@ -154,6 +155,22 @@ _             `convolve` Series []          = Series []
 -- | Elementwise multiplication, assuming missing terms are zero.
 (.*.) :: Num a => Series a -> Series a -> Series a
 Series a .*. Series b = Series (zipWith (*) a b)
+
+-- | Extend both series to the same length with placeholder zeros.
+--   Needed for safe use of complement-based operations.
+extendToSameLength (Series a, Series b) = (Series resultA, Series resultB)
+  where
+    (resultA, resultB) = go a b
+    go  []       []  = (    [] ,    [] )
+    go (b:bs) (c:cs) = (  b:bs',  c:cs')
+      where
+        ~(bs', cs') = go bs cs
+    go (b:bs)    []  = (  b:bs, 0.0:cs')
+      where
+        ~(bs', cs') = go bs []
+    go    []  (c:cs) = (0.0:bs',  c:cs )
+      where
+        ~(bs', _  ) = go [] cs
 
 instance Num a => Num (Series a) where
   Series a + Series b = Series (go a b)

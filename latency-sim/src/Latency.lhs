@@ -190,9 +190,14 @@ That is, event $min(a,b)$ occured when $t<a$ or $t<b$, when:
 rd1 `firstToFinishLD` rd2 = LatencyDistribution {
      prob     = diffEnc
               $ complement
-              $ complement (cumsum $ prob rd1) .*.
-                complement (cumsum $ prob rd2)
+              $ complement (cumsum rd1') .*.
+                complement (cumsum rd2')
   }
+  where
+    (rd1', rd2') = extendToSameLength (prob rd1, prob rd2)
+    -- | Valid only if both lists have the same length
+    complement :: Series Probability -> Series Probability
+    complement = fmap (1.0-)
 ```
 
 Now let's define neutral elements of both operations above:
@@ -339,7 +344,4 @@ instance IsList LatencyDistribution where
 
 instance Show LatencyDistribution where
   showsPrec _ ld s = "LatencyDistribution "++ showsPrec 0 (fmap unProb $ unSeries $ prob ld) s
-
-complement :: Series Probability -> Series Probability
-complement = fmap (1.0-)
 ```

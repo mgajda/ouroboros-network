@@ -1,4 +1,6 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE OverloadedLists #-}
 module Latency.SeriesSpec where
 
@@ -16,9 +18,7 @@ import Series
 instance Arbitrary a => Arbitrary (Series a) where
   arbitrary = Series <$> arbitrary
 
-instance CoArbitrary a => CoArbitrary (Series a) where
-  coarbitrary = coarbitrary . unSeries
-
+deriving instance CoArbitrary a => CoArbitrary (Series a)
 
 pascalTriangle :: Integer -> Series Integer
 pascalTriangle row = Series [nk row column | column <- [0..row]]
@@ -67,5 +67,9 @@ spec = do
   describe "addition" $ do
     prop "scaling is distributive over fmap" $
       \a b (NonZero s) -> s.*(a+b) == (s.*a)+ (s.*(b ::Series Integer))
+    prop "sum has the length of longest argument" $
+        \a b -> size ((a::Series Int) + b) == max (size a) (size b)
+
+size = length . unSeries
 
 unDelay (Delay d) = d

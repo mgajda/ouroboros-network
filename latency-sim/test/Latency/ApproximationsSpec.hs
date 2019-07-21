@@ -24,39 +24,39 @@ spec = do
          describe "Check individual ops" $ do
            describe "TTC ops on earliest" $ do
              it "earliest of noDelay is 0" $ do
-               earliest [1] `shouldBe` Earliest 0
+               earliest [1] `shouldBe` Earliest (Sometime 0)
              it "earliest of [0.0] is never" $ do
-               earliest [0.0] `shouldBe`Earliest maxBound
+               earliest [0.0] `shouldBe` Earliest Never
              it "earliest of [1.0] is 0" $ do
-               earliest [1.0] `shouldBe`Earliest 0
-             it "earliest is never lower than 0" $
-               property $ \x -> earliest x >= Earliest 0
+               earliest [1.0] `shouldBe` Earliest (Sometime 0)
+             it "earliest is never lower than 0, if there are non-lost packets" $
+               property $ \x -> x /= allLost ==> earliest x >= Earliest (Sometime 0)
              it "earliest of non-zero singleton is always 0" $
-               property $ \x -> x > 0.0 ==> earliest [x] `shouldBe`Earliest 0
+               property $ \x -> x > 0.0 ==> earliest [x] `shouldBe` Earliest (Sometime 0)
              it "earliest of n element series of non-zero elements is always zero" $
-               property $ \(Positive x) (Positive n) -> earliest (fromList $ replicate n x) `shouldBe`Earliest 0
+               property $ \(Positive x) (Positive n) -> earliest (fromList $ replicate n x) `shouldBe` Earliest (Sometime 0)
              skip $ it "earliest of allLost is 0" $ do
-               earliest (allLost @LatencyDistribution) `shouldBe`Earliest 0
+               earliest (allLost @LatencyDistribution) `shouldBe` Earliest (Sometime 0)
              it "earliest of delay t is t" $ do
-               property $ \t -> earliest (delay t) `shouldBe`Earliest (t :: Delay)
+               property $ \t -> earliest (delay t) `shouldBe` Earliest (Sometime (t :: Delay))
            describe "TTC ops on latest" $ do
              it "latest of noDelay is 0" $ do
-               latest [1] `shouldBe`Latest 0
+               latest [1] `shouldBe` Latest (Sometime 0)
              skip $ it "Latest of allLost is 0" $ do
-               latest (allLost @LatencyDistribution) `shouldBe`Latest 0
+               latest (allLost @LatencyDistribution) `shouldBe` Latest (Sometime 0)
              it "latest of [0.0] is never" $ do
-               latest [0.0] `shouldBe`Latest maxBound
+               latest [0.0] `shouldBe` Latest Never
              it "latest of delay t is t" $ do
-               property $ \t -> latest (delay t) `shouldBe`Latest (t :: Delay)
+               property $ \t -> latest (delay t) `shouldBe` Latest (Sometime t)
              it "latest of series with indices 0, 1 is one" $
-               property $ latest [0.0, 1.0] `shouldBe`Latest 1
+               property $ latest [0.0, 1.0] `shouldBe` Latest (Sometime 1)
              it "latest of series with indices 0, 1 is one" $
-               property $ \n -> latest (fromList [0.1 | _ <- [0..n]]) `shouldBe`Latest n
+               property $ \n -> latest (fromList [0.1 | _ <- [0..n]]) `shouldBe` Latest (Sometime n)
              it "earliest of n element series of non-zero elements is always its length less one" $
-               property $ \(Positive x) (NonNegative n) -> latest (fromList $ replicate n x) `shouldBe`Latest (Delay (n-1))
+               property $ \(Positive x) (Positive n) -> latest (fromList $ replicate n x) `shouldBe` Latest (Sometime (Delay (n-1)))
          describe "Check approximations that are functors" $ do
-           earliestIsTTCFunctor
-           latestIsTTCFunctor
+           earliestIsFunctorForTTC
+           latestIsFunctorForTTC
 
 -- | Verify the functor with respect to TTC operations on `LatencyDistribution`s.
 {-verifyTTCFunctor :: (TimeToCompletion b
@@ -78,8 +78,8 @@ verifyTTCFunctor name compatible extract =
                           ((a `after`                b) `compatible`
                           (extract  a `after`         extract b))
      prop "delay"         $ \t -> delay t `compatible` delay t
--- FIXME:                  delay                     `compatible` delay
+     prop "allLost"       $ allLost  `compatible` allLost
 
-earliestIsTTCFunctor = verifyTTCFunctor "earliest" (\a b -> earliest a `shouldBe`b) earliest
+earliestIsFunctorForTTC = verifyTTCFunctor "earliest" (\a b -> earliest a `shouldBe` b) earliest
 
-latestIsTTCFunctor   = verifyTTCFunctor "latest"   (\a b -> latest   a `shouldBe`b) latest
+latestIsFunctorForTTC   = verifyTTCFunctor "latest"   (\a b -> latest   a `shouldBe` b) latest

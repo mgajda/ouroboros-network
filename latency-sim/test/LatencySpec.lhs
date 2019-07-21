@@ -39,9 +39,12 @@ To convert possibly improper `LatencyDistribution` into its canonical representa
 ```{.haskell .literate}
 canonicalizeLD :: LatencyDistribution -> LatencyDistribution
 canonicalizeLD = LatencyDistribution     . Series
-               . assureAtLeastOneElement . dropTrailingZeros
+               . assureAtLeastOneElement . dropTrailingZeros . cutWhenSumOverOne 0.0
                . unSeries                . prob
   where
+    cutWhenSumOverOne aSum []                  = []
+    cutWhenSumOverOne aSum (x:xs) | aSum+x>1.0 = []
+    cutWhenSumOverOne aSum (x:xs)              = x:cutWhenSumOverOne (aSum+x) xs
     assureAtLeastOneElement []    = [0.0]
     assureAtLeastOneElement other = other
     dropTrailingZeros             = reverse . dropWhile (==0.0) . reverse
@@ -52,15 +55,15 @@ We use QuickCheck generate random distribution for testing:
 instance Arbitrary LatencyDistribution where
   arbitrary = sized $ \maxLen -> do
     actualLen <- choose (0, maxLen-1)
-    ld <- LatencyDistribution . Series <$> case actualLen of
+    ld <- canonicalizeLD . LatencyDistribution . Series <$> case actualLen of
             0 -> (:[]) <$> arbitrary
             _ -> -- Last should be non-zero
                  (++) <$> vector actualLen
                       <*> ((:[]) . getPositive <$> arbitrary)
     if isValidLD ld
        then pure ld
-       else arbitrary
-  shrink (unSeries . prob -> ls) = LatencyDistribution <$> Series <$> recursivelyShrink ls
+       else error $ "Generated " <> show ld
+  shrink (unSeries . prob -> ls) = filter isValidLD (LatencyDistribution <$> Series <$> recursivelyShrink ls)
 ```
 Equality uses lexicographic comparison, since that allows shortcut evaluation
 by the length of shorter distribution:
@@ -88,4 +91,5 @@ spec = describe "Arbitrary instance for LatencyDistributions" $ do
          it "[1.0] is valid" $ isValidLD [1.0] `shouldBe` True
          it "[0.0,1.0] is valid" $ isValidLD [0.0, 1.0] `shouldBe` True
          it "[1.0,0.0] is not valid" $ isValidLD [1.0, 0.0] `shouldBe` False
+         prop "canonicalizeLD always produces a valid LatencyDistribution" $ \s -> isValidLD (canonicalizeLD (LatencyDistribution (Series s)))
 ```
