@@ -77,6 +77,13 @@ cumsum = Series
 diffEnc :: Num a => Series a -> Series a
 diffEnc (Series []) = Series []
 diffEnc (Series s ) = Series $ head s : zipWith (-) (tail s) s
+
+-- Helper operations to express differentiation by parts
+decons ::  Num a        =>     Series a  -> (a, Series a)
+decons (   Series (s:ss)) = (s, Series (0:ss))
+
+recons :: (Num a, Eq a) => (a, Series a) ->     Series a
+recons (s, Series (0:ss)) = (   Series (s:ss))
 ```
 This serves to get cumulants:
 ```{.haskell .literate .ignored}
@@ -138,7 +145,7 @@ $$(f * g)(t) \triangleq\ \Sigma_{0}^\infty f(\tau) g(t - \tau)$$
 $$(f * g)(t) \triangleq\ \Sigma_{0}^{n} f_{\tau} g_{t - \tau}.$$
 
 Resulting in convolution:
-$$F(t)*G(t)=\Sigma_{0}^t x^t*(f_0*g_t+f_1*g_{t-1}+...+g_0*f_t) $$
+$$F(t)*G(t)=Σ_{0}^t x^t*(f_0*g_t+f_1*g_{t-1}+...+g_0*f_t) $$
 
 
 ```{.haskell .literate}
@@ -165,10 +172,10 @@ extendToSameLength (Series a, Series b) = (Series resultA, Series resultB)
     go (b:bs) (c:cs) = (  b:bs',  c:cs')
       where
         ~(bs', cs') = go bs cs
-    go (b:bs)    []  = (  b:bs, 0.0:cs')
+    go (b:bs)    []  = (  b:bs, 0  :cs')
       where
         ~(bs', cs') = go bs []
-    go    []  (c:cs) = (0.0:bs',  c:cs )
+    go    []  (c:cs) = (0  :bs',  c:cs )
       where
         ~(bs', _  ) = go [] cs
 

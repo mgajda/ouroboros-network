@@ -67,6 +67,12 @@ spec = do
          == (Series $ (0::Int):unSeries s)
     prop "cumulative sum is of right adjoint of discrete differences" $
       \s -> diffEnc (cumsum s) == (s :: Series Int)
+  describe "product rule for backward finite difference" $ do
+    prop "differentiation by parts" $ \ss tt ->
+      length ss > 0 || length tt > 0 ==>
+      let (s, t) = extendToSameLength (ss, tt)
+      in    diffEnc (s .*. (t::Series Integer))
+         == diffEnc  s .*. t + s .*. diffEnc t - diffEnc s .*. diffEnc t
   describe "cut" $ do
     prop "length after cut is minimum of input length and series length" $
       \t s -> length (cut t s) == unDelay t `min` length (s :: Series Int)

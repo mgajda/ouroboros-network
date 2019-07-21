@@ -205,6 +205,46 @@ rd1 `firstToFinishLD` rd2 = canonicalizeLD
     complement :: Series Probability -> Series Probability
     complement = fmap (1.0-)
 ```
+Notes:
+
+1. Since we model this with finite discrete series, we first need to extend them
+to the same length.
+2. Using the fact that `cumsum` is discrete correspondent of integration,
+and `diffEnc` is its direct inverse (without a loss of a constant),
+we can try to differentiate this to get PDF directly:
+$$ P_a(x≤t)=∫_0^tP(x)dx$$
+In continuous domain, one can also differentiate both sides of the equation above
+to check if we can save computations by computing PDF directly:
+
+$$
+\begin{array}{rcl} \left(∫_0^{t}P_{min(a,b)}(x)dx\right)' & = & \left(1-(1-∫_0^{t}P_a(x)dx)*(1-∫_0^tP_b(x)dx)\right)' \\
+ P_{min(a,b)}(t) & = & \left(1-(1-∫_0^{t}P_a(x)dx)*(1-∫_0^tP_b(x)dx)\right)' \\
+ & = & \left(1-1+(∫_0^{t}P_a(x)dx)+(∫_0^tP_b(x)dx)-(∫_0^{t}P_a(x)dx*∫_0^tP_b(x)dx)\right)' \\
+ & = & \left(∫_0^{t}P_a(x)dx)'+(∫_0^tP_b(x)dx)'-(∫_0^{t}P_a(x)dx*∫_0^tP_b(x)dx\right)' \\
+ & = & P_a(x)+P_b(x)-\left(∫_0^{t}P_a(x)dx*∫_0^tP_b(x)dx\right)' \\
+ & = & P_a(x)+P_b(x)-\left(∫_0^{t}P_a(x)dx\right)'*∫_0^tP_b(x)dx -∫_0^{t}P_a(x)dx*\left(∫_0^tP_b(x)dx\right)' \\
+ & = & P_a(x)+P_b(x)-P_a(x)*∫_0^tP_b(x)dx -∫_0^{t}P_a(x)dx*P_b(x) \\
+ & = & P_a(x)\left(1-∫_0^tP_b(x)dx)\right)+P_b(x)\left(1-∫_0^{t}P_a(x)dx\right) \\
+ \end{array}
+$$
+
+Unfortunately, that means that instead of 2x cumulative sum operations,
+elementwise multiplication, and 1x differential encoding operation,
+we still need to perform the same 2x cumulative sums, and more pointwise additions,
+and two complements.
+
+It is unclear that we improve much here by using an equation
+which has less obvious correctness. Code would look like:
+```{.haskell .ignore}
+rd1 `firstToFinishLD` rd2 = canonicalizeLD
+                          $ LatencyDistribution {
+     prob     = rd1' .*. complement (cumsum rd2')
+              + rd2' .*. complement (cumsum rd1')
+  }
+```
+
+In order to use this approach in here, we need to prove that `cumsum` and `diffEnc`
+correspond to integration, and differentiation operators for discrete time domain.
 
 Now let's define neutral elements of both operations above:
 ```{.haskell}
@@ -231,6 +271,9 @@ rd1 `lastToFinishLD` rd2 = canonicalizeLD
   where
     (rd1', rd2') = extendToSameLength (prob rd1, prob rd2)
 ```
+
+(Attempt to differentiate these by parts also leads to more complex equation:
+`rd1 .*. cumsum rd2 + rd2 .*. cumsum rd1`.)
 
 Now we can make an abstract interpretation of protocol code to derive
 corresponding improper CDF of message arrival.
@@ -381,4 +424,3 @@ a ~~ b = distance a b < similarityThreshold
 
 similarityThreshold = 1e-6
 ```
-
