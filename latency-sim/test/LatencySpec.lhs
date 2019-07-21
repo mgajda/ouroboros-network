@@ -13,6 +13,7 @@ import Series
 import Latency
 
 import Test.QuickCheck.Gen(sized, choose)
+import Test.QuickCheck((==>))
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Modifiers
 
@@ -33,21 +34,6 @@ isValidLD [_]           = True -- any distribution with a single-element domain 
 isValidLD (last . unSeries . prob -> 0.0) = False -- any distribution with more than one element and last element of zero is invalid (to prevent redundant representations.)
 isValidLD (prob -> probs) = (sum probs) <= 1.0 -- sum of probabilities shall never exceed 0.0
                          && all isValidProbability probs -- each value must be valid value for probability
-```
-
-To convert possibly improper `LatencyDistribution` into its canonical representation:
-```{.haskell .literate}
-canonicalizeLD :: LatencyDistribution -> LatencyDistribution
-canonicalizeLD = LatencyDistribution     . Series
-               . assureAtLeastOneElement . dropTrailingZeros . cutWhenSumOverOne 0.0
-               . unSeries                . prob
-  where
-    cutWhenSumOverOne aSum []                  = []
-    cutWhenSumOverOne aSum (x:xs) | aSum+x>1.0 = []
-    cutWhenSumOverOne aSum (x:xs)              = x:cutWhenSumOverOne (aSum+x) xs
-    assureAtLeastOneElement []    = [0.0]
-    assureAtLeastOneElement other = other
-    dropTrailingZeros             = reverse . dropWhile (==0.0) . reverse
 ```
 
 We use QuickCheck generate random distribution for testing:
@@ -92,4 +78,5 @@ spec = describe "Arbitrary instance for LatencyDistributions" $ do
          it "[0.0,1.0] is valid" $ isValidLD [0.0, 1.0] `shouldBe` True
          it "[1.0,0.0] is not valid" $ isValidLD [1.0, 0.0] `shouldBe` False
          prop "canonicalizeLD always produces a valid LatencyDistribution" $ \s -> isValidLD (canonicalizeLD (LatencyDistribution (Series s)))
+         prop "shrink always produces a valid LatencyDistribution" $ \ld -> isValidLD ld ==> all isValidLD (shrink ld)
 ```

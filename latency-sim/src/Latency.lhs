@@ -35,6 +35,7 @@ module Latency(
   , LatencyDistribution(..)
   , TimeToCompletion   (..)
   , attenuated
+  , canonicalizeLD
   ) where
 
 import GHC.Exts(IsList(..))
@@ -187,7 +188,8 @@ That is, event $min(a,b)$ occured when $t<a$ or $t<b$, when:
     *  either $a$ did **not** occur $1-P_a(x≤t)$,
     *  and $b$ did **not** occur $1-P_b(x≤t)$:
 ```{.haskell}
-rd1 `firstToFinishLD` rd2 = LatencyDistribution {
+rd1 `firstToFinishLD` rd2 = canonicalizeLD
+                          $ LatencyDistribution {
      prob     = diffEnc
               $ complement
               $ complement (cumsum rd1') .*.
@@ -217,10 +219,13 @@ Here:
 until they both are:
 $$ \text{P}_{max(a,b)}(x \leq t)= P_a(x\leq t) * P_b(x\leq t)$$
 ```{.haskell}
-rd1 `lastToFinishLD` rd2 = LatencyDistribution {
-    prob = diffEnc
-         $ cumsum (prob rd1) .*. cumsum (prob rd2)
-  }
+rd1 `lastToFinishLD` rd2 = canonicalizeLD
+                         $ LatencyDistribution {
+      prob = diffEnc
+           $ cumsum rd1' .*. cumsum rd2'
+    }
+  where
+    (rd1', rd2') = extendToSameLength (prob rd1, prob rd2)
 ```
 
 Now we can make an abstract interpretation of protocol code to derive
@@ -345,3 +350,20 @@ instance IsList LatencyDistribution where
 instance Show LatencyDistribution where
   showsPrec _ ld s = "LatencyDistribution "++ showsPrec 0 (fmap unProb $ unSeries $ prob ld) s
 ```
+
+To convert possibly improper `LatencyDistribution` into its canonical representation:
+```{.haskell .literate}
+canonicalizeLD :: LatencyDistribution -> LatencyDistribution
+canonicalizeLD = LatencyDistribution     . Series
+               . assureAtLeastOneElement . dropTrailingZeros . cutWhenSumOverOne 0.0
+               . unSeries                . prob
+  where
+    cutWhenSumOverOne aSum []                  = []
+    cutWhenSumOverOne aSum (x:xs) | aSum+x>1.0 = []
+    cutWhenSumOverOne aSum (x:xs)              = x:cutWhenSumOverOne (aSum+x) xs
+    assureAtLeastOneElement []    = [0.0]
+    assureAtLeastOneElement other = other
+    dropTrailingZeros             = reverse . dropWhile (==0.0) . reverse
+```
+
+

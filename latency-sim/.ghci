@@ -2,3 +2,6 @@
 :set -XScopedTypeVariables
 :set -XFlexibleContexts
 import Latency
+import LatencyEstimates
+import Series
+import Simulation
