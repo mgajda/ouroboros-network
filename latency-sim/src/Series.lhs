@@ -66,25 +66,23 @@ cumsum = Series
        . tail -- drop uninformative zero at the beginning of result
        . scanl (+) 0
        . unSeries
+```
+Differential encoding is lossless
+correspondent of discrete differences, but with
+first coefficient being copied.
+(Like there was fake zero before the series,
+ to preserve information about first term.)
+This is _backward antidifference_ as defined by @wiki:antidifference.
 
--- | Differential encoding is lossless
---   correspondent of discrete differences, but with
---   first coefficient being copied.
---   (Like there was fake zero before the series,
---    to preserve information about first term.)
---
---   That makes it an inverse of `cumsum`.
+That makes it an inverse of `cumsum`.
+It is _backward finite difference operator_, as defined by @wiki:backwardFiniteDifference.
+
+```{.haskell .literate}
 diffEnc :: Num a => Series a -> Series a
 diffEnc (Series []) = Series []
 diffEnc (Series s ) = Series $ head s : zipWith (-) (tail s) s
-
--- Helper operations to express differentiation by parts
-decons ::  Num a        =>     Series a  -> (a, Series a)
-decons (   Series (s:ss)) = (s, Series (0:ss))
-
-recons :: (Num a, Eq a) => (a, Series a) ->     Series a
-recons (s, Series (0:ss)) = (   Series (s:ss))
 ```
+
 This serves to get cumulants:
 ```{.haskell .literate .ignored}
 test_simpleCumsum  = cumsum [1,1,1] == ([1,2,3] :: Series Int)
