@@ -40,6 +40,10 @@ spec = do
     it "test simple convolution" $ convolve [1,1] [1,1] `shouldBe` ([1,2,1] :: Series Int)
     prop "test convolution on pascal triangle" $ \(NonNegative row) ->
       (iterate (convolve [1,1]) [1])!!fromInteger row == pascalTriangle row
+    prop "convolution by [0,..,0, 1.0] with n zeros is the same as delaying by n" $
+      \s n -> (>0) `any` (unSeries s) -- that also implies `length s > 0`
+          ==> (s `convolve` Series (replicate n 0 <> [1]))
+           ==  Series              (replicate n 0 <> (unSeries s :: [Integer]))
   it "test series addition" $ [0,2,3,4,5] + [1] `shouldBe` ([1,2,3,4,5] :: Series Int)
   it "test probability of coincidence (elementwise multiplication)" $ [0.2, 0.4, 0.4] .*. [0.25,0.0,0.25,0.25] `shouldBe` ([0.05,0.0,0.1] :: Series Double)
   describe "cumulative sums" $ do
@@ -52,6 +56,10 @@ spec = do
     prop "cumulative sum preserves input's first term" $ \s ->
       length (unSeries s) >= 1 ==>
         first (cumsum s) == first (s :: Series Int)
+    prop "cumulative sum preserves length" $
+      \s -> length (cumsum s) == length (s :: Series Int)
+    prop "differential encoding preserves length" $
+      \s -> length (diffEnc s) == length (s :: Series Int)
     prop "cumulative sum is left adjoint of discrete differences" $
       \s -> cumsum (diffEnc  s) == (s :: Series Integer)
     prop "cumulative sum after prepending zero is of left adjoint of discrete differences on non-null series" $

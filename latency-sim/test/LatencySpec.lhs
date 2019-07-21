@@ -90,8 +90,8 @@ spec = do
     prop "canonicalizeLD always produces a valid LatencyDistribution" $ \s  -> isValidLD (canonicalizeLD (LatencyDistribution (Series s)))
     prop "shrink always produces a valid LatencyDistribution"         $ \ld -> isValidLD ld ==> all isValidLD (shrink ld)
   describe "basic operations on LatencyDistribution" $ do
-    prop "multiplication of to undelayed singletons is preserved by `after`" $ \          a            b  -> [a] `after`              [b] `shouldBeSimilar`      ([a*b] :: LatencyDistribution)
-    prop "afterLD of different length distributions is correct"              $ \(Positive a) (Positive b) -> [a] `after`         [0,0, b] `shouldBeSimilar` ([0.0, a*b] :: LatencyDistribution)
-    prop "firstToFinish of different length distributions is correct"        $ \(Positive a) (Positive b) -> [a] `firstToFinish` [0,0, b] `shouldBeSimilar`      ([a  ] :: LatencyDistribution)
-    prop "lastToFinish of different length distributions is correct"         $ \(Positive a) (Positive b) -> [a] `lastToFinish`  [0,0, b] `shouldBeSimilar` ([0.0,   b] :: LatencyDistribution)
+    prop "multiplication of to undelayed singletons is preserved by `after`" $ \          a            b  -> [a] `after`                [b]   `shouldBeSimilar`      ([a*b] :: LatencyDistribution)
+    prop "afterLD of different length distributions is correct"              $ \(Positive a) (Positive b) -> [a] `after`           [0.0, b]   `shouldBeSimilar` ([0.0, a*b] :: LatencyDistribution)
+    it   "firstToFinish of different length distributions is correct"        $                               [1.0] `firstToFinish` [0.0, 1.0] `shouldBeSimilar` ([1.0] :: LatencyDistribution)
+    it   "lastToFinish of different length distributions is correct"         $                               [1.0] `lastToFinish`  [0.0, 1.0] `shouldBeSimilar` ([0.0, 1.0] :: LatencyDistribution)
 ```
