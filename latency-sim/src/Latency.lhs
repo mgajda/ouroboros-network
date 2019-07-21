@@ -36,6 +36,9 @@ module Latency(
   , TimeToCompletion   (..)
   , attenuated
   , canonicalizeLD
+  , (~~)
+  , distance
+  , similarityThreshold
   ) where
 
 import GHC.Exts(IsList(..))
@@ -366,5 +369,16 @@ canonicalizeLD = LatencyDistribution     . Series
     assureAtLeastOneElement other = other
     dropTrailingZeros             = reverse . dropWhile (==0.0) . reverse
 ```
+To compare distributions which are represented by series of floating point values we need approximate equality:
+```{.haskell .literate}
+LatencyDistribution l `distance` LatencyDistribution m =
+  unProb $ sum $ fmap (^2) $ l-m
+```
 
+Choosing `0.001` as similarity threshold (should depend on number of samples)
+```{.haskell .literate}
+a ~~ b = distance a b < similarityThreshold
+
+similarityThreshold = 1e-6
+```
 

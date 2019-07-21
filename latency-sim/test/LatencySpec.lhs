@@ -19,6 +19,7 @@ import Test.QuickCheck.Modifiers
 
 import Test.Hspec.QuickCheck(prop)
 import Test.Hspec(describe, it, shouldBe)
+import Test.Hspec.Expectations(expectationFailure)
 ```
 
 # Appendix: Validation and test case generation for latency distributions
@@ -68,6 +69,14 @@ lexCompare (x:xs) (y:ys) = case compare x y of
 invertComparison LT = GT
 invertComparison GT = LT
 invertComparison EQ = EQ
+
+a `shouldBeSimilar` b =
+   if (a~~b)
+     then True `shouldBe` True
+     else expectationFailure msg
+  where
+    dist = a `distance` b
+    msg = "Expected: " <> show a <> "\nActual: " <> show b <> "\ndifference is:" <> show (a `distance` b)
 ```
 
 ```{.haskell .literate}
@@ -81,8 +90,8 @@ spec = do
     prop "canonicalizeLD always produces a valid LatencyDistribution" $ \s  -> isValidLD (canonicalizeLD (LatencyDistribution (Series s)))
     prop "shrink always produces a valid LatencyDistribution"         $ \ld -> isValidLD ld ==> all isValidLD (shrink ld)
   describe "basic operations on LatencyDistribution" $ do
-    prop "multiplication of to undelayed singletons is preserved by `after`" $ \          a            b  -> [a] `after`              [b] `shouldBe`      ([a*b] :: LatencyDistribution)
-    prop "afterLD of different length distributions is correct"              $ \(Positive a) (Positive b) -> [a] `after`         [0,0, b] `shouldBe` ([0.0, a*b] :: LatencyDistribution)
-    prop "firstToFinish of different length distributions is correct"        $ \(Positive a) (Positive b) -> [a] `firstToFinish` [0,0, b] `shouldBe`      ([a  ] :: LatencyDistribution)
-    prop "lastToFinish of different length distributions is correct"         $ \(Positive a) (Positive b) -> [a] `lastToFinish`  [0,0, b] `shouldBe` ([0.0,   b] :: LatencyDistribution)
+    prop "multiplication of to undelayed singletons is preserved by `after`" $ \          a            b  -> [a] `after`              [b] `shouldBeSimilar`      ([a*b] :: LatencyDistribution)
+    prop "afterLD of different length distributions is correct"              $ \(Positive a) (Positive b) -> [a] `after`         [0,0, b] `shouldBeSimilar` ([0.0, a*b] :: LatencyDistribution)
+    prop "firstToFinish of different length distributions is correct"        $ \(Positive a) (Positive b) -> [a] `firstToFinish` [0,0, b] `shouldBeSimilar`      ([a  ] :: LatencyDistribution)
+    prop "lastToFinish of different length distributions is correct"         $ \(Positive a) (Positive b) -> [a] `lastToFinish`  [0,0, b] `shouldBeSimilar` ([0.0,   b] :: LatencyDistribution)
 ```

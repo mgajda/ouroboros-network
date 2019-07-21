@@ -92,18 +92,8 @@ histogram = fromList . scale . go (0, 0) . sort
          else -- d>height
               count:go (height+1, 0) (d:ds)
 ```
-To compare distributions we compute euclidean distance between their histograms:
-```{.haskell .literate}
-LatencyDistribution l `distance` LatencyDistribution m =
-  unProb $ sum $ fmap (^2) $ l-m
-```
-
-Choosing `0.001` as similarity threshold (should depend on number of samples)
-```{.haskell .literate}
-a `similar` b = distance a b < 0.001
-```
 Now we can compare simulations too:
 ```{.haskell .literate}
-s `similarByDistribution` t = similar <$> sampleSimulation s
-                                      <*> sampleSimulation t
+s `similarByDistribution` t = (~~) <$> sampleSimulation s
+                                   <*> sampleSimulation t
 ```

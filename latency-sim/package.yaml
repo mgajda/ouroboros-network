@@ -62,6 +62,7 @@ tests:
     - latency-sim
     - QuickCheck
     - hspec
+    - hspec-expectations
     - statistics
     build-tools:
     - hspec-discover
