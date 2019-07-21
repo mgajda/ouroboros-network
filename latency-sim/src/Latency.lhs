@@ -159,7 +159,8 @@ in parallel: $$ΔQ(t)=ΔQ_1(t)\mathbf{;}ΔQ_2(t)$$.
       $$ΔQ(t)\mathbf{;}1_{\mathcal{Q}}=1_{\mathcal{Q}}\mathbf{;}ΔQ(t)=ΔQ(t)$$
 
 ```{.haskell}
-rd1 `afterLD` rd2 = LatencyDistribution {
+rd1 `afterLD` rd2 = canonicalizeLD
+                  $ LatencyDistribution {
                     prob     = prob rd1 `convolve` prob rd2
                   }
 ```

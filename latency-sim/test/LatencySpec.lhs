@@ -71,12 +71,18 @@ invertComparison EQ = EQ
 ```
 
 ```{.haskell .literate}
-spec = describe "Arbitrary instance for LatencyDistributions" $ do
-         prop "generates result that passes validLD" $ \x -> isValidLD x `shouldBe` True
-         it "[0.0, 0.0] is not valid" $ isValidLD [0.0, 0.0] `shouldBe` False
-         it "[1.0] is valid" $ isValidLD [1.0] `shouldBe` True
-         it "[0.0,1.0] is valid" $ isValidLD [0.0, 1.0] `shouldBe` True
-         it "[1.0,0.0] is not valid" $ isValidLD [1.0, 0.0] `shouldBe` False
-         prop "canonicalizeLD always produces a valid LatencyDistribution" $ \s -> isValidLD (canonicalizeLD (LatencyDistribution (Series s)))
-         prop "shrink always produces a valid LatencyDistribution" $ \ld -> isValidLD ld ==> all isValidLD (shrink ld)
+spec = do
+  describe "Arbitrary instance for LatencyDistributions" $ do
+    prop "generates result that passes validLD" $ \x -> isValidLD x `shouldBe` True
+    it "[0.0, 0.0] is not valid" $ isValidLD [0.0, 0.0] `shouldBe` False
+    it "[1.0] is valid" $ isValidLD [1.0] `shouldBe` True
+    it "[0.0,1.0] is valid" $ isValidLD [0.0, 1.0] `shouldBe` True
+    it "[1.0,0.0] is not valid" $ isValidLD [1.0, 0.0] `shouldBe` False
+    prop "canonicalizeLD always produces a valid LatencyDistribution" $ \s -> isValidLD (canonicalizeLD (LatencyDistribution (Series s)))
+    prop "shrink always produces a valid LatencyDistribution" $ \ld -> isValidLD ld ==> all isValidLD (shrink ld)
+  describe "basic operations on LatencyDistribution" $ do
+    prop "multiplication of to undelayed singletons is preserved"     $ \          a            b  -> [a] `after`              [b] `shouldBe`      ([a*b] :: LatencyDistribution)
+    prop "afterLD of different length distributions is correct"       $ \(Positive a) (Positive b) -> [a] `after`         [0,0, b] `shouldBe` ([0.0, a*b] :: LatencyDistribution)
+    prop "firstToFinish of different length distributions is correct" $ \(Positive a) (Positive b) -> [a] `firstToFinish` [0,0, b] `shouldBe`      ([a*b] :: LatencyDistribution)
+    prop "lastToFinish of different length distributions is correct"  $ \(Positive a) (Positive b) -> [a] `lastToFinish`  [0,0, b] `shouldBe` ([0.0, a*b] :: LatencyDistribution)
 ```
