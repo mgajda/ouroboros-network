@@ -94,4 +94,5 @@ spec = do
     prop "afterLD of different length distributions is correct"              $ \(Positive a) (Positive b) -> [a] `after`           [0.0, b]   `shouldBeSimilar` ([0.0, a*b] :: LatencyDistribution)
     it   "firstToFinish of different length distributions is correct"        $                               [1.0] `firstToFinish` [0.0, 1.0] `shouldBeSimilar` ([1.0] :: LatencyDistribution)
     it   "lastToFinish of different length distributions is correct"         $                               [1.0] `lastToFinish`  [0.0, 1.0] `shouldBeSimilar` ([0.0, 1.0] :: LatencyDistribution)
+    it "noDelay is the same as delay 0" $ (noDelay :: LatencyDistribution) == delay 0
 ```

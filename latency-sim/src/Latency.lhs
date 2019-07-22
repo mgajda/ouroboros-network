@@ -254,11 +254,11 @@ correspond to integration, and differentiation operators for discrete time domai
 
 Now let's define neutral elements of both operations above:
 ```{.haskell}
-attenuated a = LatencyDistribution {
+preserved a = LatencyDistribution {
     prob = Series [a]
   }
-allLostLD = attenuated 0.0
-noDelayLD = attenuated 1.0
+allLostLD = preserved 0.0
+noDelayLD = preserved 1.0
 ```
 Here:
 
