@@ -67,8 +67,13 @@ spec = do
          == (Series $ (0::Int):unSeries s)
     prop "cumulative sum is of right adjoint of discrete differences" $
       \s -> diffEnc (cumsum s) == (s :: Series Int)
-  describe "product rule for backward finite difference" $ do
-    prop "differentiation by parts" $ \ss tt ->
+  describe "backward finite difference" $ do
+    prop "sum rule" $ \ss tt ->
+      length ss > 0 || length tt > 0 ==>
+      let (s, t) = extendToSameLength (ss, tt)
+      in    diffEnc (s + (t::Series Integer))
+         == diffEnc s + diffEnc t
+    prop "product rule" $ \ss tt ->
       length ss > 0 || length tt > 0 ==>
       let (s, t) = extendToSameLength (ss, tt)
       in    diffEnc (s .*. (t::Series Integer))

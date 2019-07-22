@@ -210,36 +210,42 @@ Notes:
 1. Since we model this with finite discrete series, we first need to extend them
 to the same length.
 2. Using the fact that `cumsum` is discrete correspondent of integration,
-and `diffEnc` is its direct inverse (without a loss of a constant),
+and `diffEnc` is its direct inverse (_backward finite difference_),
 we can try to differentiate this to get PDF directly:
-$$ P_a(x≤t)=∫_0^tP(x)dx$$
+$$ \begin{array}{lcr} P_a(x≤t) & = & Σ_{x=0}^{t}P_a(x) \\
+∇\left(Σ_0^{t}P_{a}(x)dx\right) & = & P_a(t) \\
+\end{array}$$
 In continuous domain, one can also differentiate both sides of the equation above
 to check if we can save computations by computing PDF directly:
 
 $$
-\begin{array}{rcl} \left(∫_0^{t}P_{min(a,b)}(x)dx\right)' & = & \left(1-(1-∫_0^{t}P_a(x)dx)*(1-∫_0^tP_b(x)dx)\right)' \\
- P_{min(a,b)}(t) & = & \left(1-(1-∫_0^{t}P_a(x)dx)*(1-∫_0^tP_b(x)dx)\right)' \\
- & = & \left(1-1+(∫_0^{t}P_a(x)dx)+(∫_0^tP_b(x)dx)-(∫_0^{t}P_a(x)dx*∫_0^tP_b(x)dx)\right)' \\
- & = & \left(∫_0^{t}P_a(x)dx)'+(∫_0^tP_b(x)dx)'-(∫_0^{t}P_a(x)dx*∫_0^tP_b(x)dx\right)' \\
- & = & P_a(x)+P_b(x)-\left(∫_0^{t}P_a(x)dx*∫_0^tP_b(x)dx\right)' \\
- & = & P_a(x)+P_b(x)-\left(∫_0^{t}P_a(x)dx\right)'*∫_0^tP_b(x)dx -∫_0^{t}P_a(x)dx*\left(∫_0^tP_b(x)dx\right)' \\
- & = & P_a(x)+P_b(x)-P_a(x)*∫_0^tP_b(x)dx -∫_0^{t}P_a(x)dx*P_b(x) \\
- & = & P_a(x)\left(1-∫_0^tP_b(x)dx)\right)+P_b(x)\left(1-∫_0^{t}P_a(x)dx\right) \\
+\begin{array}{rcl} ∇\left(Σ_{x=0}^{t}P_{min(a,b)}(x)dx\right) & = & ∇\left(1-(1-Σ_{x=0}^{t}P_a(x)dx)*(1-Σ_{x=0}^tP_b(x)dx)\right) \\
+ P_{min(a,b)}(t) & = & ∇\left(1-(1-Σ_{x=0}^{t}P_a(x))*(1-Σ_{x=0}^tP_b(x))\right) \\
+ & = & ∇\left(1-1+(Σ_{x=0}^{t}P_a(x))+(Σ_{x=0}^tP_b(x))-(Σ_{x=0}^{t}P_a(x)*Σ_{x=0}^tP_b(x))\right) \\
+ & = & ∇\left(Σ_{x=0}^{t}P_a(x))'+(Σ_{x=0}^tP_b(x))'-(Σ_{x=0}^{t}P_a(x)dx*Σ_{x=0}^tP_b(x)\right) \\
+ & = & P_a(t)+P_b(t)-∇\left(Σ_{x=0}^{t}P_a(x)*Σ_{x=0}^tP_b(x)\right) \\
+ & = & P_a(t)+P_b(t)-∇\left(Σ_{x=0}^{t}P_a(x)\right)*Σ_{x=0}^tP_b(x) \; + \\
+ & - & Σ_{x=0}^{t}P_a(x)*∇\left(Σ_{x=0}^tP_b(x)\right)+P_a(x)*P_b(x) \\
+ & = & P_a(x)+P_b(x)-P_a(x)*Σ_{x=0}^tP_b(x) -Σ_{x=0}^{t}P_a(x)dx*P_b(x) \\
+ & + & P_a(t)*P_b(t) \\
+ & = & P_a(x)\left(1-Σ_{x=0}^tP_b(x))\right)+P_b(x)\left(1-Σ_{x=0}^{t}P_a(x)\right) + P_a(t)*P_b(t) \\
  \end{array}
 $$
 
 Unfortunately, that means that instead of 2x cumulative sum operations,
-elementwise multiplication, and 1x differential encoding operation,
-we still need to perform the same 2x cumulative sums, and more pointwise additions,
-and two complements.
+1x elementwise multiplication, and 1x differential encoding operation,
+we still need to perform the same 2x cumulative sums, and 3x pointwise additions
+and 3x pointwise multiplications, and two complements.
 
-It is unclear that we improve much here by using an equation
-which has less obvious correctness. Code would look like:
+So we get an equation that is less obviously correct,
+and more computationally expensive.
+Code would look like:
 ```{.haskell .ignore}
 rd1 `firstToFinishLD` rd2 = canonicalizeLD
                           $ LatencyDistribution {
      prob     = rd1' .*. complement (cumsum rd2')
               + rd2' .*. complement (cumsum rd1')
+              + rd1' .*. rd2'
   }
 ```
 
@@ -281,10 +287,10 @@ corresponding improper CDF of message arrival.
 4. Failover $A<t>B$ when action is attempted for a fixed period of time $t$,
    and if it does not complete in this time, the other action is attempted:
 ```{.haskell .literate}
-failover deadline rdTry rdCatch =
-    LatencyDistribution {
+failover deadline rdTry rdCatch = canonicalizeLD
+    $ LatencyDistribution {
         prob     = initial <> fmap (remainder*) (prob rdCatch)
-    }
+      }
   where
     initial :: Series Probability
     initial = cut deadline $ prob rdTry
@@ -408,9 +414,9 @@ canonicalizeLD = LatencyDistribution     . Series
     cutWhenSumOverOne aSum []                  = []
     cutWhenSumOverOne aSum (x:xs) | aSum+x>1.0 = []
     cutWhenSumOverOne aSum (x:xs)              = x:cutWhenSumOverOne (aSum+x) xs
-    assureAtLeastOneElement []    = [0.0]
-    assureAtLeastOneElement other = other
-    dropTrailingZeros             = reverse . dropWhile (==0.0) . reverse
+    assureAtLeastOneElement []                 = [0.0]
+    assureAtLeastOneElement other              = other
+    dropTrailingZeros                          = reverse . dropWhile (==0.0) . reverse
 ```
 To compare distributions which are represented by series of floating point values we need approximate equality:
 ```{.haskell .literate}
