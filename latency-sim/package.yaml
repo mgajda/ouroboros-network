@@ -1,5 +1,5 @@
 name:                latency-sim
-version:             0.1.0.0
+version:             0.2.0.0
 github:              "mgajda/latency-sim"
 license:             BSD3
 author:              "Michał J. Gajda"
@@ -27,9 +27,7 @@ ghc-options:
 library:
   source-dirs: src
   dependencies:
-    - time
     - QuickCheck
-    - primitive
     - statistics
     - mwc-random
     - hspec
@@ -42,7 +40,7 @@ library:
 executables:
   hide-codeblocks:
     main:                hide-codeblocks.hs
-    source-dirs:         app
+    source-dirs:         app/pandoc-hide-codeblocks
     ghc-options:
     - -threaded
     - -rtsopts
@@ -66,3 +64,5 @@ tests:
     - statistics
     build-tools:
     - hspec-discover
+    - markdown-unlit
+

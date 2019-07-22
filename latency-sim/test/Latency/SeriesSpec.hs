@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE OverloadedLists #-}
-module Latency.SeriesSpec where
+module Latency.SeriesSpec(spec) where
 
 import Test.QuickCheck
 import Test.QuickCheck.All
@@ -13,7 +13,7 @@ import Test.Hspec.QuickCheck
 import GHC.Exts(IsList(..))
 
 import Delay
-import Series
+import Series hiding (spec)
 
 instance Arbitrary a => Arbitrary (Series a) where
   arbitrary = Series <$> arbitrary

@@ -13,7 +13,6 @@
 module LatencyEstimates where
 
 import GHC.Exts(IsList(..))
-import Control.Monad.Primitive(PrimMonad(..))
 import Control.Monad(replicateM, liftM2)
 import Data.Function(on)
 import Data.Semigroup
@@ -23,7 +22,6 @@ import Test.QuickCheck
 import Test.Hspec(describe, SpecWith)
 import Test.Hspec.QuickCheck(prop)
 
-import Probability
 import Delay
 import Series
 import Latency as L

@@ -2,7 +2,6 @@
 {-# LANGUAGE RankNTypes #-}
 module Simulation where
 
-import           Control.Monad.Primitive(PrimMonad(..))
 import           Control.Monad(replicateM)
 import           Control.Monad.ST
 import           Data.List(sort)
@@ -10,7 +9,6 @@ import           GHC.Exts(IsList(..))
 import qualified Statistics.Distribution             as Statistics
 import qualified System.Random.MWC as MWC(Gen, GenST, withSystemRandom, asGenST)
 
-import           Probability
 import           Latency
 ```
 
@@ -52,12 +50,11 @@ Key part is generating a process of length with a given random distribution:
 instance Stochastic Simulation where
   fromDistribution d = Simulation sim
     where
-      sim :: forall m. PrimMonad m => MWC.Gen (PrimState m) -> m Delay
+      sim :: MWC.GenST s -> ST s Delay
       sim st = roundDelay <$> Statistics.genContVar d st
         where
           roundDelay :: Double -> Delay
           roundDelay = Delay . fromEnum . toInteger . truncate
-
 ```
 
 Correctness of simulation lies on the assumption that we
