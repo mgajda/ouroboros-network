@@ -33,8 +33,8 @@ newtype Simulation = Simulation {
   }
 
 instance TimeToCompletion Simulation where
-  firstToFinish = onSimulation max
-  lastToFinish  = onSimulation min
+  firstToFinish = onSimulation min
+  lastToFinish  = onSimulation max
   after         = onSimulation (+)
   delay       t = Simulation $ const $ return t
   allLost       = Simulation $ const $ return maxBound
@@ -54,7 +54,7 @@ instance Stochastic Simulation where
       sim st = roundDelay <$> Statistics.genContVar d st
         where
           roundDelay :: Double -> Delay
-          roundDelay = Delay . fromEnum . toInteger . truncate
+          roundDelay = Delay . fromEnum . toInteger . ceiling
 ```
 
 Correctness of simulation lies on the assumption that we

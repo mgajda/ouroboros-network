@@ -426,5 +426,5 @@ Choosing `0.001` as similarity threshold (should depend on number of samples)
 ```{.haskell .literate}
 a ~~ b = distance a b < similarityThreshold
 
-similarityThreshold = 1e-6
+similarityThreshold = 1e-3
 ```
