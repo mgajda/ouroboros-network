@@ -27,10 +27,10 @@ ghc-options:
 library:
   source-dirs: src
   dependencies:
+    - hspec
+    - mwc-random
     - QuickCheck
     - statistics
-    - mwc-random
-    - hspec
   build-tools:
     - markdown-unlit
     - pandoc
@@ -57,11 +57,11 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - latency-sim
-    - QuickCheck
     - hspec
     - hspec-expectations
+    - latency-sim
     - statistics
+    - QuickCheck
     build-tools:
     - hspec-discover
     - markdown-unlit
