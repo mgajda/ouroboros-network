@@ -42,30 +42,21 @@ spec = do
            describe "TTC ops on latest" $ do
              it "latest of noDelay is 0" $ do
                latest [1] `shouldBe` Latest (Sometime 0)
-             skip $ it "Latest of allLost is 0" $ do
-               latest (allLost @LatencyDistribution) `shouldBe` Latest (Sometime 0)
+             it "Latest of allLost is 0" $ do
+               latest (allLost @LatencyDistribution) `shouldBe` Latest Never
              it "latest of [0.0] is never" $ do
                latest [0.0] `shouldBe` Latest Never
              it "latest of delay t is t" $ do
                property $ \t -> latest (delay t) `shouldBe` Latest (Sometime t)
+             it "latest of delay t is t" $ do
+               property $ \t -> latest (delay t) `shouldBe` Latest (Sometime t)
              it "latest of series with indices 0, 1 is one" $
                property $ latest [0.0, 1.0] `shouldBe` Latest (Sometime 1)
-             it "latest of series with indices 0, 1 is one" $
-               property $ \n -> latest (fromList [0.1 | _ <- [0..n]]) `shouldBe` Latest (Sometime n)
-             it "earliest of n element series of non-zero elements is always its length less one" $
-               property $ \(Positive x) (Positive n) -> latest (fromList $ replicate n x) `shouldBe` Latest (Sometime (Delay (n-1)))
-         describe "Check approximations that are functors" $ do
+         describe "Check that bounds are functors" $ do
            earliestIsFunctorForTTC
            latestIsFunctorForTTC
 
 -- | Verify the functor with respect to TTC operations on `LatencyDistribution`s.
-{-verifyTTCFunctor :: (TimeToCompletion b
-                    ,TimeToCompletion a
-                    ,Show             a
-                    ,Arbitrary        a)
-                 =>  String
-                 -> (a -> b -> Bool)
-                 -> (a -> b) -> SpecWith ()-}
 verifyTTCFunctor name compatible extract =
   describe (name ++ " is a functor with respect to ") $ do
      prop "firstToFinish" $ \a b -> (isValidLD a && isValidLD b) ==>
@@ -83,3 +74,4 @@ verifyTTCFunctor name compatible extract =
 earliestIsFunctorForTTC = verifyTTCFunctor "earliest" (\a b -> earliest a `shouldBe` b) earliest
 
 latestIsFunctorForTTC   = verifyTTCFunctor "latest"   (\a b -> latest   a `shouldBe` b) latest
+
