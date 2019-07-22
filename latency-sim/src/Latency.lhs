@@ -34,7 +34,7 @@ module Latency(
   , start
   , LatencyDistribution(..)
   , TimeToCompletion   (..)
-  , attenuated
+  , preserved
   , canonicalizeLD
   , (~~)
   , distance
@@ -45,8 +45,6 @@ import GHC.Exts(IsList(..))
 import Control.Monad(replicateM)
 import Data.Function(on)
 import Data.Semigroup
---import qualified Statistics.Distribution as Statistics(ContGen(..))
---import qualified System.Random.MWC as MWC(Gen, withSystemRandom)
 import Test.QuickCheck
 
 import Probability
@@ -377,7 +375,7 @@ Note that both of these binary operators give also rise to two
 almost-scalar multiplication operators:
 ```{.haskell .literate}
 scaleProbability :: Probability -> LatencyDistribution -> LatencyDistribution
-scaleProbability a = after $ attenuated a
+scaleProbability a = after $ preserved a
 
 scaleDelay  :: Delay -> LatencyDistribution -> LatencyDistribution
 scaleDelay       t = after $ delayLD    t
