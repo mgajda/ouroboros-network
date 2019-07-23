@@ -22,6 +22,7 @@ import Test.QuickCheck
 import Test.Hspec(describe, SpecWith)
 import Test.Hspec.QuickCheck(prop)
 
+import Probability
 import Delay
 import Series
 import Latency as L
@@ -29,16 +30,13 @@ import Latency as L
 
 ## Bounds on distributions
 
-Note that we can define bounds on `LatencyDistribution`.
-Earliest functor behaves like functor
+Note that we can define bounds on `LatencyDistribution` that behave like functors
 over basic operations from `TimeToCompletion` class.
 
 * Upper bound on distribution is the `Latest` possible time^[Here `liftBinOp` is for lifting an operator to a newtype.]:
 ```{.haskell .literate}
 newtype Latest = Latest { unLatest :: SometimeOrNever }
-  deriving (Eq, Show)
-  deriving Ord
-    via SometimeOrNever
+  deriving (Eq, Ord, Show)
 
 newtype SometimeOrNever = SometimeOrNever { unSometimeOrNever :: Maybe Delay }
   deriving (Eq)
@@ -60,11 +58,8 @@ instance Ord SometimeOrNever where
   Sometime t `compare` Sometime u = t `compare` u
 
 latest :: LatencyDistribution -> Latest
-latest [0.0]                           = Latest Never
+latest ((<1.0) . sum . prob -> True)   = Latest Never
 latest (last . unSeries . prob -> 0.0) = error "Canonical LatencyDistribution should always end with non-zero value"
--- TODO: check whether this way of checking 1.0 is stable enough?
---      (Can use rational instead to avoid loss of resolution that gives incorrect results.)
-latest ((<1.0) . sum . prob -> True)   = Latest Never -- some packets may be irretrievably lost
 latest  x                              = Latest . Sometime . Delay . (-1+) . length . unSeries . prob $ x
 
 onLatest = liftBinOp unLatest Latest

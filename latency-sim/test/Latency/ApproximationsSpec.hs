@@ -34,7 +34,8 @@ spec = do
              it "earliest of non-zero singleton is always 0" $
                property $ \x -> x > 0.0 ==> earliest [x] `shouldBe` Earliest (Sometime 0)
              it "earliest of n element series of non-zero elements is always zero" $
-               property $ \(Positive x) (Positive n) -> earliest (fromList $ replicate n x) `shouldBe` Earliest (Sometime 0)
+               property $ \(Positive x) (Positive n) -> earliest (fromList $ replicate n x)
+                             `shouldBe` Earliest (Sometime 0)
              skip $ it "earliest of allLost is 0" $ do
                earliest (allLost @LatencyDistribution) `shouldBe` Earliest (Sometime 0)
              it "earliest of delay t is t" $ do
@@ -74,4 +75,3 @@ verifyTTCFunctor name compatible extract =
 earliestIsFunctorForTTC = verifyTTCFunctor "earliest" (\a b -> earliest a `shouldBe` b) earliest
 
 latestIsFunctorForTTC   = verifyTTCFunctor "latest"   (\a b -> latest   a `shouldBe` b) latest
-

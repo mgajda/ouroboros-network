@@ -11,14 +11,14 @@ OPTS
 
 echo "Making hide-codeblocks filter"
 #ghc hide-codeblocks.hs -o hide-codeblocks
-stack install # for `hide-codeblocks`
+stack install latency-sim:exe:pandoc-hide-codeblocks # for `hide-codeblocks`
 
 echo "Making TEX"
-pandoc --filter=pandoc-citeproc --filter=hide-codeblocks --natbib --from=${FORMAT} --standalone --variable mainfont="DejaVu Serif" --variable sansfont="DejaVu Sans" --to=latex --pdf-engine=xelatex ${INPUTS} -o ${NAME}.tex --bibliography=Latency.bib
+stack exec -- pandoc --filter=pandoc-citeproc --filter=pandoc-hide-codeblocks --natbib --from=${FORMAT} --standalone --variable mainfont="DejaVu Serif" --variable sansfont="DejaVu Sans" --to=latex --pdf-engine=xelatex ${INPUTS} -o ${NAME}.tex --bibliography=Latency.bib
 #--filter=pandoc-citeproc --biblio=Latency.bib
 
 echo "Making PDF"
-pandoc --filter=hide-codeblocks --filter=pandoc-citeproc          --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable  sansfont="DejaVu Sans" --pdf-engine=xelatex ${INPUTS} -o ${NAME}.pdf
+stack exec -- pandoc --filter=pandoc-hide-codeblocks --filter=pandoc-citeproc          --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable  sansfont="DejaVu Sans" --pdf-engine=xelatex ${INPUTS} -o ${NAME}.pdf
 
 #echo "Linking .lhs"
 #pandoc --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont="DejaVu Sans" --pdf-engine=xelatex ${INPUTS} --to rst+literate_haskell -o ${NAME}.lhs
@@ -28,7 +28,7 @@ echo "Interpreting .lhs"
 ghc -pgmL markdown-unlit -I../test/ *.lhs ../test/*.lhs
 
 echo "Making .html"
-pandoc --filter=hide-codeblocks --mathml --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont=Arial --pdf-engine=xelatex ${INPUTS} -o ${NAME}.html --highlight-style=espresso
+stack exec -- pandoc --filter=pandoc-hide-codeblocks --mathml --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont=Arial --pdf-engine=xelatex ${INPUTS} -o ${NAME}.html --highlight-style=espresso
 
 echo "Checking for missing files in toc.list:"
 for i in *.lhs *.mmd; do grep $i toc.list>/dev/null || echo "Missing file in TOC: $i"; done

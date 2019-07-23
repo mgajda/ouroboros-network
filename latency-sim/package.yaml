@@ -27,10 +27,10 @@ ghc-options:
 library:
   source-dirs: src
   dependencies:
-    - hspec
     - mwc-random
     - QuickCheck
     - statistics
+    - hspec
   build-tools:
     - markdown-unlit
     - pandoc
@@ -38,8 +38,8 @@ library:
 
 # This is a build tool for documentation - a pandoc filter.
 executables:
-  hide-codeblocks:
-    main:                hide-codeblocks.hs
+  pandoc-hide-codeblocks:
+    main:                pandoc-hide-codeblocks.hs
     source-dirs:         app/pandoc-hide-codeblocks
     ghc-options:
     - -threaded
@@ -57,9 +57,9 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - latency-sim
     - hspec
     - hspec-expectations
-    - latency-sim
     - statistics
     - QuickCheck
     build-tools:

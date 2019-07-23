@@ -117,7 +117,7 @@ start :: Delay
 start  = Delay 0
 ```
 
-## Intuitive properties of ΔQ
+## Intuitive properties of latency distributions
 
 1. We can define few *linear* operators on ΔQ (for exact definition, see next section):
 
@@ -128,7 +128,7 @@ $$wait(t)=f(t)= \begin{cases} 0 & \text{for } t<t_d \\ 1.0 & \text{for } t=t_d \
 
     C. Scaling arrival probability -- in other words, $\text{attenuation}$.
 
-2. We distinguish special distribution that represents *null delay* or *neutral element* of sequential composition, where we pass every message with no delay: $$attenuated(1)=wait(0)=1_{\mathcal{Q}}$$
+2. We distinguish special distribution that represents *null delay* or *neutral element* of sequential composition, where we pass every message with no delay: $$preserved(1)=wait(0)=1_{\mathcal{Q}}$$
 
 3. We can say that one $ΔQ$ no worse than the other,
    when it is improper CDF values never less than the other after making it fit a common
@@ -245,6 +245,11 @@ rd1 `firstToFinishLD` rd2 = canonicalizeLD
               + rd2' .*. complement (cumsum rd1')
               + rd1' .*. rd2'
   }
+  where
+    (rd1', rd2') = extendToSameLength (prob rd1, prob rd2)
+    -- | Valid only if both lists have the same length
+    complement :: Series Probability -> Series Probability
+    complement = fmap (1.0-)
 ```
 
 In order to use this approach in here, we need to prove that `cumsum` and `diffEnc`
@@ -281,6 +286,12 @@ rd1 `lastToFinishLD` rd2 = canonicalizeLD
 
 Now we can make an abstract interpretation of protocol code to derive
 corresponding improper CDF of message arrival.
+
+It is also:
+
+* commutative
+* associative
+* with neutral element of noDelay
 
 4. Failover $A<t>B$ when action is attempted for a fixed period of time $t$,
    and if it does not complete in this time, the other action is attempted:
@@ -348,6 +359,10 @@ class TimeToCompletion ttc where
   -- | Add explicit case/if to make correct estimate
   --   single pass instead of trace
 
+infixr 7 `after`
+infixr 5 `firstToFinish`
+infixr 5 `lastToFinish`
+
 instance TimeToCompletion LatencyDistribution where
   firstToFinish = firstToFinishLD
   lastToFinish  = lastToFinishLD
@@ -410,7 +425,7 @@ canonicalizeLD = LatencyDistribution     . Series
                . unSeries                . prob
   where
     cutWhenSumOverOne aSum []                  = []
-    cutWhenSumOverOne aSum (x:xs) | aSum+x>1.0 = []
+    cutWhenSumOverOne aSum (x:xs) | aSum+x>1.0 = [1.0-aSum]
     cutWhenSumOverOne aSum (x:xs)              = x:cutWhenSumOverOne (aSum+x) xs
     assureAtLeastOneElement []                 = [0.0]
     assureAtLeastOneElement other              = other
@@ -426,5 +441,7 @@ Choosing `0.001` as similarity threshold (should depend on number of samples)
 ```{.haskell .literate}
 a ~~ b = distance a b < similarityThreshold
 
-similarityThreshold = 1e-3
+infix 3 ~~
+
+similarityThreshold = 1e-6
 ```

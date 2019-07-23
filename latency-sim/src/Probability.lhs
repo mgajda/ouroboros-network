@@ -32,7 +32,7 @@ bibliography:
 module Probability(Probability(..)
                   ,isValidProbability) where
 
-import Data.Ratio((%))
+import Data.Ratio((%), Ratio)
 import Test.QuickCheck
 
 ```
@@ -43,8 +43,8 @@ import Test.QuickCheck
 is defined here for reference:
 ```{.haskell .literate}
 -- | Between 0.0 and 1.0
-newtype Probability = Prob { unProb :: Double }
-  deriving (Num, Fractional, Real, Floating, Ord, Eq,
+newtype Probability = Prob { unProb :: Ratio Integer }
+  deriving (Num, Fractional, Real, Ord, Eq,
             CoArbitrary, Show)
 
 isValidProbability :: Probability -> Bool
