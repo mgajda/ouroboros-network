@@ -31,6 +31,8 @@ library:
     - QuickCheck
     - statistics
     - hspec
+    - validity
+    - genvalidity
   build-tools:
     - markdown-unlit
     - pandoc
@@ -62,6 +64,9 @@ tests:
     - hspec-expectations
     - statistics
     - QuickCheck
+    - validity
+    - genvalidity
+    - genvalidity-hspec
     build-tools:
     - hspec-discover
     - markdown-unlit

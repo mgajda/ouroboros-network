@@ -20,31 +20,34 @@ bibliography:
 ---
 
 ```{.haskell .hidden}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes        #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedLists   #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE TypeOperators     #-}
-{-# LANGUAGE UnicodeSyntax     #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE OverloadedLists            #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE UnicodeSyntax              #-}
+{-# LANGUAGE ViewPatterns               #-}
 module Latency(
     Delay(..)
+  , Metric(..)
   , start
   , LatencyDistribution(..)
   , TimeToCompletion   (..)
   , preserved
   , canonicalizeLD
   , (~~)
-  , distance
-  , similarityThreshold
   ) where
 
 import GHC.Exts(IsList(..))
 import Control.Monad(replicateM)
 import Data.Function(on)
 import Data.Semigroup
+import Data.Validity
 import Test.QuickCheck
 
 import Probability
@@ -96,23 +99,45 @@ Below is Haskell specification of this datatype:
 ```{.haskell .literate}
 newtype LatencyDistribution =
   LatencyDistribution {
-    prob :: Series Probability
+    pdf :: Series Probability
   }
 ```
 The representation above holds PDF (probability density function).
 Its cumulative distribution function can be trivially computed with running sum:
-```
+```{.haskell .literate}
 cdf :: LatencyDistribution -> Series Probability
-cdf = cumsum . prob
+cdf = cumsum . pdf
 ```
-(There is inverse operation of differential encoding `diffEnc` in the [`Series`
- module](#series), to recover PDF from CDF.)
+
+Since it is common use complement of CDF, we can have accessor for this one too:
+```{.haskell .literate}
+complementCDF :: LatencyDistribution -> Series Probability
+complementCDF = fmap (1.0-) . cumsum . pdf
+```
+
+Since we use `canonicalizeLD` to make sure that every distribution is kept
+in canonical form, we might also want to make constructors that create `LatencyDistribution`
+from a series that represents PDF or CDF:
+```{.haskell .literate}
+fromPDF = canonicalizeLD . LatencyDistribution
+```
+
+To create LatencyDistribution from CDF we need `diffEnc`
+(_differential encoding_ or _backward finite difference operator_
+ from [`Series` module](#series)):
+```{.haskell .literate}
+fromCDF = canonicalizeLD . LatencyDistribution . diffEnc
+```
+Similar we can create `LatencyDistribution` from complement of CDF:
+```{.haskell .literate}
+fromComplementOfCDF = canonicalizeLD . LatencyDistribution . diffEnc . fmap (1.0-)
+```
 
 For ease of implementation, we express each function as a series of values
 for [discrete delays](#delay). First value is for *no delay*.
 We define $start \in{}\mathcal{T}$ as smallest `Delay` (no delay).
 
-```
+```{.haskell .ignore}
 start :: Delay
 start  = Delay 0
 ```
@@ -160,10 +185,7 @@ in parallel: $$ΔQ(t)=ΔQ_1(t)\mathbf{;}ΔQ_2(t)$$.
       $$ΔQ(t)\mathbf{;}1_{\mathcal{Q}}=1_{\mathcal{Q}}\mathbf{;}ΔQ(t)=ΔQ(t)$$
 
 ```{.haskell}
-rd1 `afterLD` rd2 = canonicalizeLD
-                  $ LatencyDistribution {
-                    prob     = prob rd1 `convolve` prob rd2
-                  }
+rd1 `afterLD` rd2 = fromPDF $ pdf rd1 `convolve` pdf rd2
 ```
 
 2. Alternative selection ∨: given $ΔQ_1(t)$ and $ΔQ_2(t)$ of two different
@@ -189,16 +211,13 @@ That is, event $min(a,b)$ occured when $t<a$ or $t<b$, when:
 * it **did not occur** (top complement: $1-...$), that:
     *  either $a$ did **not** occur $1-P_a(x≤t)$,
     *  and $b$ did **not** occur $1-P_b(x≤t)$:
-```{.haskell}
-rd1 `firstToFinishLD` rd2 = canonicalizeLD
-                          $ LatencyDistribution {
-     prob     = diffEnc
-              $ complement
-              $ complement (cumsum rd1') .*.
-                complement (cumsum rd2')
-  }
+```{.haskell .literate}
+rd1 `firstToFinishLD` rd2 = fromComplementOfCDF
+                          $ rd1cCDF .*.
+                            rd2cCDF
   where
-    (rd1', rd2') = extendToSameLength (prob rd1, prob rd2)
+    (rd1cCDF, rd2cCDF) = extendToSameLength 1 (complementCDF rd1,
+                                               complementCDF rd2)
     -- | Valid only if both lists have the same length
     complement :: Series Probability -> Series Probability
     complement = fmap (1.0-)
@@ -241,12 +260,12 @@ Code would look like:
 ```{.haskell .ignore}
 rd1 `firstToFinishLD` rd2 = canonicalizeLD
                           $ LatencyDistribution {
-     prob     = rd1' .*. complement (cumsum rd2')
+     pdf      = rd1' .*. complement (cumsum rd2')
               + rd2' .*. complement (cumsum rd1')
               + rd1' .*. rd2'
   }
   where
-    (rd1', rd2') = extendToSameLength (prob rd1, prob rd2)
+    (rd1', rd2') = extendToSameLength 0 (pdf rd1, pdf rd2)
     -- | Valid only if both lists have the same length
     complement :: Series Probability -> Series Probability
     complement = fmap (1.0-)
@@ -258,7 +277,7 @@ correspond to integration, and differentiation operators for discrete time domai
 Now let's define neutral elements of both operations above:
 ```{.haskell}
 preserved a = LatencyDistribution {
-    prob = Series [a]
+    pdf = Series [a]
   }
 allLostLD = preserved 0.0
 noDelayLD = preserved 1.0
@@ -272,13 +291,10 @@ Here:
 until they both are:
 $$ \text{P}_{max(a,b)}(x \leq t)= P_a(x\leq t) * P_b(x\leq t)$$
 ```{.haskell}
-rd1 `lastToFinishLD` rd2 = canonicalizeLD
-                         $ LatencyDistribution {
-      prob = diffEnc
-           $ cumsum rd1' .*. cumsum rd2'
-    }
+rd1 `lastToFinishLD` rd2 = fromCDF
+                         $ cumsum rd1' .*. cumsum rd2'
   where
-    (rd1', rd2') = extendToSameLength (prob rd1, prob rd2)
+    (rd1', rd2') = extendToSameLength 0 (pdf rd1, pdf rd2)
 ```
 
 (Attempt to differentiate these by parts also leads to more complex equation:
@@ -296,13 +312,11 @@ It is also:
 4. Failover $A<t>B$ when action is attempted for a fixed period of time $t$,
    and if it does not complete in this time, the other action is attempted:
 ```{.haskell .literate}
-failover deadline rdTry rdCatch = canonicalizeLD
-    $ LatencyDistribution {
-        prob     = initial <> fmap (remainder*) (prob rdCatch)
-      }
+failover deadline rdTry rdCatch = fromPDF
+                                $ initial <> fmap (remainder*) (pdf rdCatch)
   where
     initial :: Series Probability
-    initial = cut deadline $ prob rdTry
+    initial = cut deadline $ pdf rdTry
     -- | Remainder of distribution for all initial values
     remainder :: Probability
     remainder = 1 - sum initial
@@ -411,10 +425,10 @@ delayLD n = LatencyDistribution
 instance IsList LatencyDistribution where
   type Item LatencyDistribution = Probability
   fromList = LatencyDistribution . Series
-  toList   = unSeries . prob
+  toList   = unSeries . pdf
 
 instance Show LatencyDistribution where
-  showsPrec _ ld s = "LatencyDistribution "++ showsPrec 0 (fmap unProb $ unSeries $ prob ld) s
+  showsPrec _ ld s = "LatencyDistribution "++ showsPrec 0 (fmap unProb $ unSeries $ pdf ld) s
 ```
 
 To convert possibly improper `LatencyDistribution` into its canonical representation:
@@ -422,7 +436,7 @@ To convert possibly improper `LatencyDistribution` into its canonical representa
 canonicalizeLD :: LatencyDistribution -> LatencyDistribution
 canonicalizeLD = LatencyDistribution     . Series
                . assureAtLeastOneElement . dropTrailingZeros . cutWhenSumOverOne 0.0
-               . unSeries                . prob
+               . unSeries                . pdf
   where
     cutWhenSumOverOne aSum []                  = []
     cutWhenSumOverOne aSum (x:xs) | aSum+x>1.0 = [1.0-aSum]
@@ -433,15 +447,20 @@ canonicalizeLD = LatencyDistribution     . Series
 ```
 To compare distributions which are represented by series of floating point values we need approximate equality:
 ```{.haskell .literate}
-LatencyDistribution l `distance` LatencyDistribution m =
-  unProb $ sum $ fmap (^2) $ l-m
+instance Metric LatencyDistribution where
+  LatencyDistribution l `distance` LatencyDistribution m =
+    realToFrac $ unProb $ sum $ fmap (^2) $ l-m
+  similarityThreshold = 1/1000
 ```
 
 Choosing `0.001` as similarity threshold (should depend on number of samples)
 ```{.haskell .literate}
-a ~~ b = distance a b < similarityThreshold
+class Metric a where
+  distance :: Fractional r => a -> a -> r
+  similarityThreshold :: Double
 
 infix 3 ~~
 
-similarityThreshold = 1e-6
+(~~) :: Metric t => t -> t -> Bool
+(~~) (a::t) (b::t) = distance a b < similarityThreshold @t
 ```

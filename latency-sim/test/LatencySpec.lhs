@@ -1,26 +1,40 @@
 ```{.haskell .hidden}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedLists  #-}
-{-# LANGUAGE TypeFamilies     #-}
-{-# LANGUAGE ViewPatterns     #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedLists     #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving  #-}
+{-# LANGUAGE ViewPatterns        #-}
 module LatencySpec where
 
 import GHC.Exts(IsList(..))
 import Data.Function(on)
 import Data.Monoid((<>))
+import Data.Typeable
+import Data.Validity
+import Data.GenValidity
 
 import Probability
 import Series
 import Latency
 
+import ProbabilitySpec
+import Latency.SeriesSpec
+
 import Test.QuickCheck.Gen(sized, choose)
 import Test.QuickCheck((==>))
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Modifiers
+import Test.Validity.Arbitrary
+import Test.Validity.Eq
+import Test.Validity.Show
+import Test.Validity.Shrinking
 
 import Test.Hspec.QuickCheck(prop)
-import Test.Hspec(describe, it, shouldBe, shouldSatisfy)
-import Test.Hspec.Expectations(expectationFailure)
+import Test.Hspec(describe, it, shouldBe, shouldSatisfy, Spec, SpecWith)
+import Test.Hspec.Expectations(expectationFailure, Expectation)
 
 import Debug.Trace(trace)
 ```
@@ -33,10 +47,10 @@ Indexing starts at 0 (which means: no delay.)
 ```{.haskell .literate}
 -- | Validity criteria for latency distributions
 isValidLD :: LatencyDistribution -> Bool
-isValidLD []                              = False
-isValidLD [p]                             = isValidProbability p -- any distribution with a single-element domain is valid (even if the value is 0.0)
-isValidLD (last . unSeries . prob -> 0.0) = False -- any distribution with more than one element and last element of zero is invalid (to prevent redundant representations.)
-isValidLD (prob -> probs)                 = sum probs <= Prob (1.0+similarityThreshold) -- sum of probabilities shall never exceed 0.0
+isValidLD []                             = False
+isValidLD [p]                            = isValidProbability p -- any distribution with a single-element domain is valid (even if the value is 0.0)
+isValidLD (last . unSeries . pdf -> 0.0) = False -- any distribution with more than one element and last element of zero is invalid (to prevent redundant representations.)
+isValidLD (pdf -> probs)                 = sum probs <= Prob 1.0 -- sum of probabilities shall never exceed 0.0
                                          && all isValidProbability probs                -- each value must be valid value for probability
 ```
 
@@ -53,13 +67,18 @@ instance Arbitrary LatencyDistribution where
     if isValidLD ld
        then pure ld
        else arbitrary
-  shrink (unSeries . prob -> ls) = filter isValidLD (LatencyDistribution <$> Series <$> recursivelyShrink ls)
+  shrink (unSeries . pdf -> ls) = filter isValidLD (LatencyDistribution <$> Series <$> recursivelyShrink ls)
+
+deriving instance Validity     LatencyDistribution
+deriving instance GenValid     LatencyDistribution
+deriving instance GenUnchecked LatencyDistribution
+deriving instance Typeable     LatencyDistribution
 ```
 Equality uses lexicographic comparison, since that allows shortcut evaluation
 by the length of shorter distribution:
 ```{.haskell .literate}
 instance Eq LatencyDistribution where
-  bs == cs = (lexCompare `on` (unSeries . prob)) bs cs == EQ
+  bs == cs = (lexCompare `on` (unSeries . pdf)) bs cs == EQ
 
 lexCompare :: [Probability] -> [Probability] -> Ordering
 lexCompare  xs     []    = if all (==0.0) xs
@@ -73,6 +92,10 @@ invertComparison LT = GT
 invertComparison GT = LT
 invertComparison EQ = EQ
 
+shouldBeSimilar :: (TimeToCompletion ttc
+                   ,Metric           ttc
+                   ,Show             ttc
+                   ) => ttc -> ttc -> Expectation
 a `shouldBeSimilar` b =
    if (a~~b)
      then True `shouldBe` True
@@ -82,6 +105,30 @@ a `shouldBeSimilar` b =
     msg = "Expected: " <> show a <> "\nActual: " <> show b <> "\ndifference is:" <> show (a `distance` b)
 
 infix 3 `shouldBeSimilar`
+
+lawsOfTTC :: forall a. (TimeToCompletion a, Eq a, Arbitrary a, Show a, Metric a) => SpecWith ()
+lawsOfTTC = do
+  it "noDelay is the same as delay 0" $ (noDelay :: a) `shouldBe` delay 0
+  describe "basic laws of convolution" $ do
+    prop "commutative"        $ \l m   ->  l `after` m `shouldBeSimilar` m `after` (l :: a)
+    prop "associative"        $ \l m n -> (l `after` m) `after` (n :: a)
+                                       ~~  l `after` (m `after` n)
+    prop "delay 0 is neutral" $ \l     ->  l `after` delay 0
+                                       ~~ (l :: a)
+  describe "basic laws of firstToFinish" $ do
+    prop "commutative"        $ \l m   -> l `firstToFinish` m
+                                       ~~ m `firstToFinish` (l :: a)
+    prop "associative"        $ \l m n -> (l `firstToFinish` m) `firstToFinish` (n :: a)
+                                       ~~  l `firstToFinish` (m `firstToFinish` n)
+    prop "delay 0 is neutral" $ \l     ->  l `firstToFinish` allLost
+                                       ~~ (l :: a)
+  describe "basic laws of firstToFinish" $ do
+    prop "commutative"        $ \l m   -> l `lastToFinish` m
+                                       ~~ m `lastToFinish` (l :: a)
+    prop "associative"        $ \l m n -> (l `lastToFinish` m) `lastToFinish` (n :: a)
+                                       ~~  l `lastToFinish` (m `lastToFinish` n)
+    prop "delay 0 is neutral" $ \l     ->  l `lastToFinish` delay 0
+                                     ~~ (l :: a)
 ```
 
 ```{.haskell .literate}
@@ -122,4 +169,9 @@ spec = do
                                         ~~  l `lastToFinish` (m `lastToFinish` n)
      prop "delay 0 is neutral" $ \l     ->  l `lastToFinish` delay 0
                                         ~~ (l :: LatencyDistribution)
+  eqSpecOnValid   @(Series Int)
+  showReadSpec    @(Series Int)
+  shrinkValidSpec @(Series Int)
+  arbitrarySpec   @(Series Int)
+
 ```

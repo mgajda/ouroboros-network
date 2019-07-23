@@ -33,7 +33,6 @@ module Probability(Probability(..)
                   ,isValidProbability) where
 
 import Data.Ratio((%), Ratio)
-import Test.QuickCheck
 
 ```
 
@@ -45,18 +44,8 @@ is defined here for reference:
 -- | Between 0.0 and 1.0
 newtype Probability = Prob { unProb :: Ratio Integer }
   deriving (Num, Fractional, Real, Ord, Eq,
-            CoArbitrary, Show)
+            Read, Show)
 
 isValidProbability :: Probability -> Bool
 isValidProbability p = p>= 0 && p<=1.0
-
-instance Arbitrary Probability where
-  arbitrary = sized $ \aSize -> do
-      let precision = fromIntegral (aSize `max` startingPrecision)
-      denominator <- choose (1, precision  )
-      numerator   <- choose (0, denominator)
-      pure         $ Prob (fromRational (numerator % denominator))
-    where
-      startingPrecision = 5
-  shrink (Prob x) = filter isValidProbability (Prob <$> shrink x)
 ```

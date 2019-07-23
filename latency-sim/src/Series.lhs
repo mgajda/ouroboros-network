@@ -50,7 +50,7 @@ but use use finite series and shortcut evaluation:
 -- | Series contain the same information as lists.
 --   We can also define lexicographic ordering on them.
 newtype Series a = Series { unSeries :: [a] }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Show, Read)
 ```
 Generating function of :
 $$ F(t)=f_0*t^0+f_1*t^1+f_2*t^2+...+f_n*t^n $$
@@ -163,17 +163,17 @@ Series a .*. Series b = Series (zipWith (*) a b)
 
 -- | Extend both series to the same length with placeholder zeros.
 --   Needed for safe use of complement-based operations.
-extendToSameLength (Series a, Series b) = (Series resultA, Series resultB)
+extendToSameLength e (Series a, Series b) = (Series resultA, Series resultB)
   where
     (resultA, resultB) = go a b
     go  []       []  = (    [] ,    [] )
     go (b:bs) (c:cs) = (  b:bs',  c:cs')
       where
         ~(bs', cs') = go bs cs
-    go (b:bs)    []  = (  b:bs, 0  :cs')
+    go (b:bs)    []  = (  b:bs, e  :cs')
       where
         ~(bs', cs') = go bs []
-    go    []  (c:cs) = (0  :bs',  c:cs )
+    go    []  (c:cs) = (e  :bs',  c:cs )
       where
         ~(bs', _  ) = go [] cs
 

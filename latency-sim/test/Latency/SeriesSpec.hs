@@ -1,19 +1,33 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving  #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving  #-}
-{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedLists            #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TypeApplications           #-}
 module Latency.SeriesSpec(spec) where
+
+import Data.Validity
+import Data.GenValidity
+import Data.Typeable
 
 import Test.QuickCheck
 import Test.QuickCheck.All
 import Test.QuickCheck.Modifiers
 import Test.Hspec
 import Test.Hspec.QuickCheck
+import Test.Validity.Arbitrary
+import Test.Validity.Eq
+import Test.Validity.Show
+import Test.Validity.Shrinking
 
 import GHC.Exts(IsList(..))
 
 import Delay
 import Series hiding (spec)
+
+deriving instance Validity     a => Validity     (Series a)
+deriving instance GenValid     a => GenValid     (Series a)
+deriving instance GenUnchecked a => GenUnchecked (Series a)
+deriving instance Typeable     a => Typeable     (Series a)
 
 instance Arbitrary a => Arbitrary (Series a) where
   arbitrary = Series <$> arbitrary
@@ -70,12 +84,12 @@ spec = do
   describe "backward finite difference" $ do
     prop "sum rule" $ \ss tt ->
       length ss > 0 || length tt > 0 ==>
-      let (s, t) = extendToSameLength (ss, tt)
+      let (s, t) = extendToSameLength 0 (ss, tt)
       in    diffEnc (s + (t::Series Integer))
          == diffEnc s + diffEnc t
     prop "product rule" $ \ss tt ->
       length ss > 0 || length tt > 0 ==>
-      let (s, t) = extendToSameLength (ss, tt)
+      let (s, t) = extendToSameLength 0 (ss, tt)
       in    diffEnc (s .*. (t::Series Integer))
          == diffEnc  s .*. t + s .*. diffEnc t - diffEnc s .*. diffEnc t
   describe "cut" $ do
@@ -89,11 +103,13 @@ spec = do
     prop "sum has the length of longest argument" $
         \a b -> length ((a::Series Int) + b) == max (length a) (length b)
   describe "extension" $ do
-    prop "results of extension have the same length" $ \a b ->
-      let (a', b') = extendToSameLength (a::Series Double, b::Series Double)
+    prop "results of extension have the same length" $ \a b c ->
+      let (a', b') = extendToSameLength c (a::Series Double, b::Series Double)
       in length a' `shouldBe` length b'
-    prop "results of extension have the length of longer" $ \a b ->
-      let (a', b') = extendToSameLength (a::Series Double, a <> b::Series Double)
+    prop "results of extension have the length of longer" $ \a b c ->
+      let (a', b') = extendToSameLength c (a::Series Double, a <> b::Series Double)
       in length a' `shouldBe` (length a + length b)
-
-unDelay (Delay d) = d
+  eqSpecOnValid   @(Series Int)
+  showReadSpec    @(Series Int)
+  shrinkValidSpec @(Series Int)
+  arbitrarySpec   @(Series Int)

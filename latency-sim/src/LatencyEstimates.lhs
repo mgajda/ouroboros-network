@@ -58,9 +58,9 @@ instance Ord SometimeOrNever where
   Sometime t `compare` Sometime u = t `compare` u
 
 latest :: LatencyDistribution -> Latest
-latest ((<1.0) . sum . prob -> True)   = Latest Never
-latest (last . unSeries . prob -> 0.0) = error "Canonical LatencyDistribution should always end with non-zero value"
-latest  x                              = Latest . Sometime . Delay . (-1+) . length . unSeries . prob $ x
+latest ((<1.0) . sum . pdf -> True)   = Latest Never
+latest (last . unSeries . pdf -> 0.0) = error "Canonical LatencyDistribution should always end with non-zero value"
+latest  x                             = Latest . Sometime . Delay . (-1+) . length . unSeries . pdf $ x
 
 onLatest = liftBinOp unLatest Latest
 
@@ -78,8 +78,8 @@ newtype Earliest = Earliest { unEarliest :: SometimeOrNever }
 earliest :: LatencyDistribution -> Earliest
 earliest [0.0]                           = Earliest Never
 earliest [_]                             = Earliest $ Sometime 0
-earliest (last . unSeries . prob -> 0.0) = error "Canonical LatencyDistribution should always end with non-zero value"
-earliest  other                          = Earliest . Sometime . Delay . (max 0) . length . takeWhile (0==) . unSeries . prob $ other
+earliest (last . unSeries . pdf -> 0.0) = error "Canonical LatencyDistribution should always end with non-zero value"
+earliest  other                          = Earliest . Sometime . Delay . (max 0) . length . takeWhile (0==) . unSeries . pdf $ other
 
 onEarliest     = liftBinOp unEarliest Earliest
 

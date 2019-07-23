@@ -37,7 +37,7 @@ import Test.QuickCheck
 
 <a name="delay">Discrete delays</a> are defined as:
 ```{.haskell .literate}
-newtype Delay       = Delay Int
+newtype Delay       = Delay { unDelay :: Int } 
   deriving (Num, Ord, Eq, Enum, Bounded, CoArbitrary, Show)
 
 instance Arbitrary Delay where
