@@ -3,8 +3,8 @@
 NAME=Latency
 INPUTS=$(cat toc.list)
 FORMAT=markdown+tex_math_dollars+yaml_metadata_block+citations
-OPTS="--filter=pandoc-citeproc --natbib --from=${FORMAT} --bibliography=Latency.bib --pdf-engine=xelatex"
-DOCOPTS='--filter=pandoc-hide-codeblocks '
+OPTS="--filter=pandoc-citeproc --bibliography=Latency.bib --from=${FORMAT} --pdf-engine=xelatex"
+#DOCOPTS='--filter=pandoc-hide-codeblocks '
 
 echo "Making hide-codeblocks filter"
 stack install latency-sim:exe:pandoc-hide-codeblocks # for `hide-codeblocks`

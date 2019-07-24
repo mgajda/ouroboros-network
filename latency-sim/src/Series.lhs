@@ -75,7 +75,7 @@ first coefficient being copied.
 This is _backward antidifference_ as defined by @wiki:antidifference.
 
 That makes it an inverse of `cumsum`.
-It is _backward finite difference operator_, as defined by @wiki:backwardFiniteDifference.
+It is _backward finite difference operator_, as defined by @wiki:backwardFiniteDifference .
 
 ```{.haskell .literate}
 diffEnc :: Num a => Series a -> Series a
