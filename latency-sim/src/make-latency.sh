@@ -24,11 +24,11 @@ stack exec -- pandoc --filter=pandoc-hide-codeblocks --filter=pandoc-citeproc   
 #pandoc --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont="DejaVu Sans" --pdf-engine=xelatex ${INPUTS} --to rst+literate_haskell -o ${NAME}.lhs
 #mln -s -p -g '*.md' '#1.lhs' >/dev/null || true
 
-echo "Interpreting .lhs"
-ghc -pgmL markdown-unlit -I../test/ *.lhs ../test/*.lhs
-
 echo "Making .html"
 stack exec -- pandoc --filter=pandoc-hide-codeblocks --mathml --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont=Arial --pdf-engine=xelatex ${INPUTS} -o ${NAME}.html --highlight-style=espresso
+
+echo "Building .lhs to check source code is valid"
+stack build
 
 echo "Checking for missing files in toc.list:"
 for i in *.lhs *.mmd; do grep $i toc.list>/dev/null || echo "Missing file in TOC: $i"; done
