@@ -213,11 +213,11 @@ That is, event $min(a,b)$ occured when $t<a$ or $t<b$, when:
     *  and $b$ did **not** occur $1-P_b(x≤t)$:
 ```{.haskell .literate}
 rd1 `firstToFinishLD` rd2 = fromComplementOfCDF
-                          $ rd1cCDF .*.
-                            rd2cCDF
+                          $ complement (cumsum rd1') .*.
+                            complement (cumsum rd2')
   where
-    (rd1cCDF, rd2cCDF) = extendToSameLength 1 (complementCDF rd1,
-                                               complementCDF rd2)
+    (rd1', rd2') = extendToSameLength 0 (pdf rd1,
+                                         pdf rd2)
     -- | Valid only if both lists have the same length
     complement :: Series Probability -> Series Probability
     complement = fmap (1.0-)
