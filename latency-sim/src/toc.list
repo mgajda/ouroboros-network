@@ -7,6 +7,7 @@ Network.lhs
 closure.mmd
 Delay.lhs
 Probability.lhs
+../test/ProbabilitySpec.lhs
 Series.lhs
 ../test/LatencySpec.lhs
 epilogue.mmd

@@ -3,29 +3,20 @@
 NAME=Latency
 INPUTS=$(cat toc.list)
 FORMAT=markdown+tex_math_dollars+yaml_metadata_block+citations
-OPTS
-
-#echo "Linking diagrams"
-#ln -s ../doc/completion-rate.png .
-#ln -s ../doc/latency-distribution.png .
+OPTS="--filter=pandoc-citeproc --natbib --from=${FORMAT} --bibliography=Latency.bib --pdf-engine=xelatex"
+DOCOPTS='--filter=pandoc-hide-codeblocks '
 
 echo "Making hide-codeblocks filter"
-#ghc hide-codeblocks.hs -o hide-codeblocks
 stack install latency-sim:exe:pandoc-hide-codeblocks # for `hide-codeblocks`
 
 echo "Making TEX"
-stack exec -- pandoc --filter=pandoc-citeproc --filter=pandoc-hide-codeblocks --natbib --from=${FORMAT} --standalone --variable mainfont="DejaVu Serif" --variable sansfont="DejaVu Sans" --to=latex --pdf-engine=xelatex ${INPUTS} -o ${NAME}.tex --bibliography=Latency.bib
-#--filter=pandoc-citeproc --biblio=Latency.bib
+stack exec -- pandoc ${OPTS} ${DOCOPTS}          --variable mainfont="DejaVu Serif" --variable sansfont="DejaVu Sans" --standalone --to=latex ${INPUTS} -o ${NAME}.tex
 
 echo "Making PDF"
-stack exec -- pandoc --filter=pandoc-hide-codeblocks --filter=pandoc-citeproc          --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable  sansfont="DejaVu Sans" --pdf-engine=xelatex ${INPUTS} -o ${NAME}.pdf
-
-#echo "Linking .lhs"
-#pandoc --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont="DejaVu Sans" --pdf-engine=xelatex ${INPUTS} --to rst+literate_haskell -o ${NAME}.lhs
-#mln -s -p -g '*.md' '#1.lhs' >/dev/null || true
+stack exec -- pandoc ${OPTS} ${DOCOPTS}          --variable mainfont="DejaVu Serif" --variable sansfont="DejaVu Sans"                         ${INPUTS} -o ${NAME}.pdf
 
 echo "Making .html"
-stack exec -- pandoc --filter=pandoc-hide-codeblocks --mathml --from=${FORMAT} --variable mainfont="DejaVu Serif" --variable sansfont=Arial --pdf-engine=xelatex ${INPUTS} -o ${NAME}.html --highlight-style=espresso
+stack exec -- pandoc ${OPTS} ${DOCOPTS} --mathml --variable mainfont="DejaVu Serif" --variable sansfont=Arial                                 ${INPUTS} -o ${NAME}.html --highlight-style=espresso
 
 echo "Building .lhs to check source code is valid"
 stack build
