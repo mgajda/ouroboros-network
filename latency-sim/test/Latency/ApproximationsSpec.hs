@@ -19,6 +19,36 @@ import GHC.Exts(IsList(..))
 
 skip _ = pure ()
 
+instance Arbitrary Earliest where
+  arbitrary = do
+    b <- arbitrary
+    Earliest <$> if b
+                    then return Never
+                    else Sometime <$> arbitrary
+
+instance Metric Earliest where
+  Earliest  Never       `distance` Earliest  Never       = 0
+  Earliest (Sometime t) `distance` Earliest (Sometime s) = fromIntegral $ unDelay $ abs (s-t)
+  Earliest  Never       `distance` Earliest (Sometime _) = fromIntegral $ largeValue
+  Earliest (Sometime _) `distance` Earliest  Never       = fromIntegral $ largeValue
+  similarityThreshold = 1
+
+largeValue = 2^30
+
+instance Arbitrary Latest where
+  arbitrary = do
+    b <- arbitrary
+    Latest <$> if b
+                    then return Never
+                    else Sometime <$> arbitrary
+
+instance Metric Latest where
+  Latest  Never       `distance` Latest  Never       = 0
+  Latest (Sometime t) `distance` Latest (Sometime s) = fromIntegral $ unDelay $ abs (s-t)
+  Latest  Never       `distance` Latest (Sometime _) = fromIntegral $ largeValue
+  Latest (Sometime _) `distance` Latest  Never       = fromIntegral $ largeValue
+  similarityThreshold = 1
+
 spec :: Spec
 spec = do
          describe "Check individual ops" $ do
@@ -56,6 +86,8 @@ spec = do
          describe "Check that bounds are functors" $ do
            earliestIsFunctorForTTC
            latestIsFunctorForTTC
+         describe "Earliest" $ lawsOfTTC @Earliest
+         describe "Latest" $ lawsOfTTC @Latest
 
 -- | Verify the functor with respect to TTC operations on `LatencyDistribution`s.
 verifyTTCFunctor name compatible extract =

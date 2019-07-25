@@ -174,4 +174,6 @@ spec = do
   shrinkValidSpec @(Series Int)
   arbitrarySpec   @(Series Int)
 
+  lawsOfTTC       @LatencyDistribution
+
 ```
