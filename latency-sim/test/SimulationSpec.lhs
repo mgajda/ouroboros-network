@@ -32,5 +32,5 @@ spec = parallel
         muD       <- sampleSimulation $ expSim         mu
         lambdaMuD <- sampleSimulation $ expSim (lambda+mu)
         let result = LatencyDistribution (pdf lambdaD + pdf muD - pdf lambdaMuD)
-        (result `shouldBeSimilar`) <$> sampleSimulation (expSim lambda `firstToFinish` expSim mu)
+        (result `shouldBeSimilar`) <$> sampleSimulation (expSim lambda `lastToFinish` expSim mu)
 ```
