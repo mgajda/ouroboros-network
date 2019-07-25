@@ -34,9 +34,8 @@ import Test.Validity.Shrinking
 
 import Test.Hspec.QuickCheck(prop)
 import Test.Hspec(describe, it, shouldBe, shouldSatisfy, Spec, SpecWith)
-import Test.Hspec.Expectations(expectationFailure, Expectation)
+import Test.Hspec.Expectations(expectationFailure, Expectation, HasCallStack)
 
-import Debug.Trace(trace)
 ```
 
 # Appendix: Validation and test case generation for latency distributions
@@ -92,7 +91,8 @@ invertComparison LT = GT
 invertComparison GT = LT
 invertComparison EQ = EQ
 
-shouldBeSimilar :: (TimeToCompletion ttc
+shouldBeSimilar :: (HasCallStack
+                   ,TimeToCompletion ttc
                    ,Metric           ttc
                    ,Show             ttc
                    ) => ttc -> ttc -> Expectation
