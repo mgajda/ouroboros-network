@@ -1,6 +1,8 @@
-
 ```{.haskell .hidden}
 module Network where
+
+import Control.Exception(assert)
+import Data.Matrix
 
 import Latency
 ```
@@ -17,7 +19,6 @@ quality of valid connection between nodes from $i$ to $j$,
 and zero value `allLost` corresponding to nodes that are not directly connected.
 
 We can generalize simple way of checking that graph is strongly connected:
-
 
 $R_n(A)=1+A+A^2+...+A^n$
 
@@ -117,6 +118,21 @@ any starting point $i$ for the duration of $n$ retransmissions.
    to issues detected by typical graph algorithms.
 
 ```{.haskell .literate}
-(|*|) = undefined -- matrix multiplication
+-- | Matrix multiplication
+(|*|) :: TimeToCompletion a => Matrix a -> Matrix a -> Matrix a
+(|*|) = matMult firstToFinish after
+-- | Given an addition and multiplication operations, derive matrix multiplication
+--   operator.
+-- TODO: Add checking dimensions
+-- Quick inefficient definition, assuming we spend most of the time multiplying
+-- values
+matMult :: (a -> a -> a) -> (a -> a -> a) -> Matrix a -> Matrix a -> Matrix a
+matMult add mul a1 a2 = assert (n' == m) $
+    matrix n m' $ \(i,j) -> foldr1 add [ (a1 ! (i,k)) `mul` (a2 ! (k,j)) | k <- [1 .. m] ]
+  where
+    n  = nrows a1
+    m  = ncols a1
+    n' = nrows a2
+    m' = ncols a2
 frob = undefined -- any reasonable metric on the matrix, like frobenius metric
 ```

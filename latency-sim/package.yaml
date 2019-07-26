@@ -27,6 +27,7 @@ ghc-options:
 library:
   source-dirs: src
   dependencies:
+    - matrix
     - mwc-random
     - QuickCheck
     - statistics
