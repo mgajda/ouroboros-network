@@ -89,12 +89,10 @@ fix step r = if r `almostEqual` r'
            else fix step r'
   where
     r' = step r
-    almostEqual :: Num a => a -> a -> Bool
-    almostEqual a1 a2 = frob (a1-a2)<=epsilon
+    almostEqual :: Metric a => a -> a -> Bool
+    almostEqual a1 a2 = (a1 `distance` a2)<=epsilon
       where
         epsilon=0.001
-        -- | Any reasonable measure of matrix divergence
-        --divergence = maximum . fmap abs . fromList
 ```
 
 We will use this to define *path with shortest ΔQ*.
@@ -117,15 +115,17 @@ any starting point $i$ for the duration of $n$ retransmissions.
 3. We need to consider further examples of how our metrics react
    to issues detected by typical graph algorithms.
 
+We define a matrix multiplication that uses `firstToFinish` in place of addition
+and `after` in place of multiplication.
 ```{.haskell .literate}
--- | Matrix multiplication
 (|*|) :: TimeToCompletion a => Matrix a -> Matrix a -> Matrix a
 (|*|) = matMult firstToFinish after
--- | Given an addition and multiplication operations, derive matrix multiplication
---   operator.
--- TODO: Add checking dimensions
--- Quick inefficient definition, assuming we spend most of the time multiplying
--- values
+```
+
+Definition of parametrized matrix multiplication is standard, so
+we can test it over other rings.
+_(We can optimize this definition later, if it turns out to be bottleneck.)_
+```{.haskell .literate}
 matMult :: (a -> a -> a) -> (a -> a -> a) -> Matrix a -> Matrix a -> Matrix a
 matMult add mul a1 a2 = assert (n' == m) $
     matrix n m' $ \(i,j) -> foldr1 add [ (a1 ! (i,k)) `mul` (a2 ! (k,j)) | k <- [1 .. m] ]
@@ -134,5 +134,21 @@ matMult add mul a1 a2 = assert (n' == m) $
     m  = ncols a1
     n' = nrows a2
     m' = ncols a2
-frob = undefined -- any reasonable metric on the matrix, like frobenius metric
+```
+Note that to measure convergence of the process, we need a notion of distance
+between two matrices.
+
+Here, we use Frobenius distance between matrices, parametrized by the notion
+of distance between any two matrix elements.
+```{.haskell .literate}
+instance Metric a => Metric (Matrix a) where
+  a `distance` b = assert ((n==n') && (m==m'))
+                 $ sqrt
+                 $ sum [square ((a !(i,k)) `distance` (b ! (i,k)))  | i <- [1..n], k<-[1..m]]
+    where
+      square x = x*x
+      n  = nrows a
+      m  = ncols a
+      n' = nrows b
+      m' = ncols b
 ```

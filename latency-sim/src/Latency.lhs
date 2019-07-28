@@ -456,7 +456,7 @@ instance Metric LatencyDistribution where
 Choosing `0.001` as similarity threshold (should depend on number of samples)
 ```{.haskell .literate}
 class Metric a where
-  distance :: Fractional r => a -> a -> r
+  distance :: a -> a -> Double
   similarityThreshold :: Double
 
 infix 3 ~~
