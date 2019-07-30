@@ -13,6 +13,7 @@ import Data.Foldable(fold)
 
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
+import Test.QuickCheck.Modifiers
 import Test.Validity
 ```
 
@@ -23,11 +24,10 @@ instance Validity a => Validity (Matrix a) where
 
 instance Arbitrary a => Arbitrary (Matrix a) where
   arbitrary = do
-    n <- arbitrary -- size constraint here? sqrt?
-    m <- arbitrary
+    Positive n <- arbitrary -- size constraint here? sqrt?
+    Positive m <- arbitrary
     fromList n m <$>
-      mapM (\_ -> arbitrary)
-        [(i,k) | i<-[1..n], k<-[1..m]]
+      sequence [arbitrary | i<-[1..n], k<-[1..m]]
   shrink a = makeMinor <$> indices a
     where
       makeMinor (i, k) = minorMatrix i k a
