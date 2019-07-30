@@ -20,7 +20,15 @@ and zero value `allLost` corresponding to nodes that are not directly connected.
 
 We can generalize simple way of checking that graph is strongly connected:
 
-$R_n(A)=1+A+A^2+...+A^n$
+$$R_n(A)=1+A*(1+A*(1+A*...))$$
+
+More rigorous formulation is:
+$$ \begin{array}{rcl}
+R_0(A) & = & 1 \\
+R_n(A) & = & 1+A*R_{n-1}(A) \\
+\end{array}
+$$
+
 
 Our key metric would be diffusion or reachability time of the network $∆R(t)$, which is conditioned
 by quality of connection curves $∆Q(t)$ and the structure network graph.

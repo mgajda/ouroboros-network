@@ -68,6 +68,7 @@ tests:
     - validity
     - genvalidity
     - genvalidity-hspec
+    - genvalidity-property
     - matrix
     build-tools:
     - hspec-discover
