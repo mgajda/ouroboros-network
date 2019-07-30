@@ -68,7 +68,7 @@ node $i$ to node $j$.
 That allows us to generalize typical graph algorithms executed to
 algorithms executed on network matrices:
 
-1. If series $R_n(A)=1+A+A^2+...+A^n$ converges to matrix of non-zero
+1. If series $R_n(A)$ converges to matrix of non-zero
 (non-`allLost`) values *in all cells* in a finite number of steps,
 we consider graph to be *strongly connected* [@GeneralMethodOfShortestPaths].
 Matrix multiplication follows uses $(\mathbf{;},∨)$-modulus.
