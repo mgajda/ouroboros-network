@@ -20,19 +20,23 @@ bibliography:
 ---
 
 ```{.haskell .hidden}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes        #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiWayIf        #-}
-{-# LANGUAGE OverloadedLists   #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE TypeOperators     #-}
-{-# LANGUAGE UnicodeSyntax     #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE MultiWayIf                 #-}
+{-# LANGUAGE OverloadedLists            #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UnicodeSyntax              #-}
+{-# LANGUAGE ViewPatterns               #-}
 module Series where
 
 import GHC.Exts(IsList(..))
+import Data.Foldable
 import Data.Semigroup
 
 import Delay
@@ -48,7 +52,6 @@ we follow [@PowerSeries] exposition of power series,
 but use use finite series and shortcut evaluation:
 ```{.haskell .literate}
 -- | Series contain the same information as lists.
---   We can also define lexicographic ordering on them.
 newtype Series a = Series { unSeries :: [a] }
   deriving (Eq, Show, Read)
 ```
@@ -70,8 +73,8 @@ cumsum = Series
 Differential encoding is lossless
 correspondent of discrete differences, but with
 first coefficient being copied.
-(Like there was fake zero before the series,
- to preserve information about first term.)
+(Just like there was a zero before each series,
+ so that we always preserve information about the first term.)
 This is _backward antidifference_ as defined by @wiki:antidifference.
 
 That makes it an inverse of `cumsum`.
@@ -120,8 +123,8 @@ instance IsList (Series a) where
 
 -- | Scalar multiplication
 infixl 7 .* -- same precedence as *
-(.*):: Num a => a -> Series a -> Series a -- type declaration for .*
-c .* (Series (f:fs)) = Series (c*f : unSeries ( c.* Series fs)) -- definition of .*
+(.*):: Num a => a -> Series a -> Series a
+c .* (Series (f:fs)) = Series (c*f : unSeries ( c.* Series fs))
 _ .* (Series []    ) = Series []
 ```
 $$ F(t)=f_0*t^0+f_1*t^1+f_2*t^2+...+f_n*t^n $$
@@ -160,7 +163,13 @@ _             `convolve` Series []          = Series []
 -- | Elementwise multiplication, assuming missing terms are zero.
 (.*.) :: Num a => Series a -> Series a -> Series a
 Series a .*. Series b = Series (zipWith (*) a b)
+```
+Since we use finite series, we need to extend their length
+when operation is done on series of different length.
 
+Here we use extension by a given element `e`, which is 0 for normal series,
+or 1 for complement series.
+```{.haskell .literate}
 -- | Extend both series to the same length with placeholder zeros.
 --   Needed for safe use of complement-based operations.
 extendToSameLength e (Series a, Series b) = (Series resultA, Series resultB)
@@ -176,18 +185,77 @@ extendToSameLength e (Series a, Series b) = (Series resultA, Series resultB)
     go    []  (c:cs) = (e  :bs',  c:cs )
       where
         ~(bs', _  ) = go [] cs
+```
+In a rare case (CDFs) we might also prolong by the length of the last entry:
+```
+-- | Extend both series to the same length with placeholder of last element.
+extendToSameLength' (Series a, Series b) = (Series resultA, Series resultB)
+  where
+    (resultA, resultB) = go a b
+    go  []       []  = (    [] ,    [] )
+    go  [b]     [c]  = (   [b] ,   [c] )
+    go (b:bs) (c:cs) = (  b:bs',  c:cs')
+      where
+        ~(bs', cs') = go bs cs
+    go (b:bs)   [c]  = (  b:bs,   c:cs')
+      where
+        ~(bs', cs') = go bs [c]
+    go   [b]  (c:cs) = (b  :bs',  c:cs )
+      where
+        ~(bs', _  ) = go [b] cs
+```
+_Note: if we aim for more elegant presentation, we might come back to infinite
+series and instead choose length of approximation when computing them._
 
+Now we can present an instance of number class for `Series`:
+```{.haskell .literate}
 instance Num a => Num (Series a) where
   Series a + Series b = Series (go a b)
     where
       go    []     ys  = ys
       go    xs     []  = xs
       go (x:xs) (y:ys) = (x+y):go xs ys
-  (*) = convolve
-  abs = fmap abs
-  signum = fmap signum
-  fromInteger = error "Do not use fromInteger on Series!!!"
-  negate = fmap negate
+  (*)         = convolve
+  abs         = fmap abs
+  signum      = fmap signum
+  fromInteger = seriesFromInteger
+  negate      = fmap negate
+```
+Note that we do not know yet how to define `fromInteger` function.
+Certainly we would like to define null and unit (neutral element) of convolution,
+but it is not clear what to do about the others:
+```{.haskell .literate}
+seriesFromInteger     0 = [0] -- null
+seriesFromInteger     1 = [1] -- unit
+seriesFromInteger other = error
+                        $ "Do not use fromInteger "
+                       <> show other <> " to get Series!"
+```
+We may be using `Series` of floating point values that are inherently approximate.
+
+In this case, we should not ever use equality, but rather a similarity metric
+that we can generate from the similar metric on values:
+```{.haskell .literate}
+instance Real           a
+      => Metric (Series a) where
+  a `distance` b = sqrt $ realToFrac $ sum $ fmap square $ a-b
+  similarityThreshold = 0.001
+
+square x = x*x
+```
+Note that generous similarity threshold of `0.001` is due to limited
+number of simulations we run when checking distributions (10k by default).
+
+`Metric` class is a pretty typical for similarity measurement:
+```{.haskell .literate}
+class Metric a where
+  distance :: a -> a -> Double
+  similarityThreshold :: Double
+
+infix 3 ~~
+
+(~~) :: Metric t => t -> t -> Bool
+(~~) (a::t) (b::t) = distance a b < similarityThreshold @t
 ```
 
 ```{.haskell .literate .hidden}

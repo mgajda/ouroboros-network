@@ -21,6 +21,7 @@ import Control.Exception(assert)
 import Data.Matrix
 import GHC.TypeNats
 
+import Series
 import Latency
 ```
 
