@@ -55,8 +55,8 @@ newtype Series a = Series { unSeries :: [a] }
 Generating function of :
 $$ F(t)=f_0*t^0+f_1*t^1+f_2*t^2+...+f_n*t^n $$
 is represented by the Haskell data structure:
-```{.literate}
-f_t = Series [a0, a1, ..., an]
+```{.haskell .literate .ignore}
+f_t = Series [a0, a1, .., an]
 ```
 
 ```{.haskell .literate}

@@ -10,4 +10,5 @@ Probability.lhs
 ../test/ProbabilitySpec.lhs
 Series.lhs
 ../test/LatencySpec.lhs
+../test/NetworkSpec.lhs
 epilogue.mmd

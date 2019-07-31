@@ -1,8 +1,25 @@
+---
+input: markdown+tex_math_dollars+yaml_metadata_block+citations
+output:
+  pdf_document:
+    keep_tex: true
+    toc: true
+    toc_depth: 2
+    latex_engine: xelatex
+bibliography:
+  - Latency.bib
+---
 ```{.haskell .hidden}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 module Network where
 
 import Control.Exception(assert)
 import Data.Matrix
+import GHC.TypeNats
 
 import Latency
 ```
@@ -159,4 +176,5 @@ instance Metric a => Metric (Matrix a) where
       m  = ncols a
       n' = nrows b
       m' = ncols b
+  similarityThreshold = similarityThreshold @a
 ```

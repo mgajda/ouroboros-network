@@ -60,8 +60,8 @@ import Series
 ## Introducing improper CDF
 
 To define our key object, lets imagine a single network connection.
-In this document, we ignore capacity-related issues, so $∆Q(t)$ is simply
-*improper cumulative distribution function* of event arriving at some point
+In this document, we ignore capacity-related issues.
+So $∆Q(t)$ is *improper cumulative distribution function* of event arriving at some point
 of time:
 
 <center>
@@ -76,7 +76,7 @@ For the sake of practicality, we also mark a *deadline* as the last possible
 moment when we still care about messages. (Afterwards, we drop them, just like
 TCP timeout works.)
 
-Note that (say) only $0.99$ of messages arrive
+For example, when only $0.99$ of messages arrive
 at all within desired time $t$, and we silently drop those that arrive later.
 
 For each distribution, we will define *deadline* formally
@@ -445,7 +445,7 @@ canonicalizeLD = LatencyDistribution     . Series
     assureAtLeastOneElement other              = other
     dropTrailingZeros                          = reverse . dropWhile (==0.0) . reverse
 ```
-To compare distributions which are represented by series of floating point values we need approximate equality:
+To compare distributions represented by series of approximate values we need approximate equality:
 ```{.haskell .literate}
 instance Metric LatencyDistribution where
   LatencyDistribution l `distance` LatencyDistribution m =
