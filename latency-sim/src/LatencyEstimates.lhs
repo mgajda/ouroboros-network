@@ -58,35 +58,40 @@ instance Ord SometimeOrNever where
   Sometime t `compare` Sometime u = t `compare` u
 
 latest :: LatencyDistribution -> Latest
-latest ((<1.0) . sum . pdf -> True)   = Latest Never
-latest (last . unSeries . pdf -> 0.0) = error "Canonical LatencyDistribution should always end with non-zero value"
-latest  x                             = Latest . Sometime . Delay . (-1+) . length . unSeries . pdf $ x
+latest ((<1.0) . sum . pdf -> True  ) = Latest Never
+latest (last . unSeries . pdf -> 0.0) =
+  error "Canonical LatencyDistribution should always end with non-zero value"
+latest  x                             = Latest . Sometime . Delay . (-1+)
+                                      . length . unSeries . pdf $ x
 
 onLatest = liftBinOp unLatest Latest
 
 instance TimeToCompletion Latest where
   firstToFinish = onLatest min
   lastToFinish  = onLatest max
-  after         = liftBinOp (unSometimeOrNever . unLatest) (Latest . SometimeOrNever) (liftM2 (+))
+  after         = liftBinOp (unSometimeOrNever . unLatest)
+                            (Latest . SometimeOrNever) (liftM2 (+))
   delay         = Latest . Sometime
-  allLost       = Latest Never -- TODO: is it clear, or use Maybe?
+  allLost       = Latest   Never
 ```
 * Lower bound on distribution is the `Earliest` possible time:
 ```{.haskell .literate}
 newtype Earliest = Earliest { unEarliest :: SometimeOrNever }
   deriving (Eq, Ord, Show)
 earliest :: LatencyDistribution -> Earliest
-earliest [0.0]                           = Earliest Never
-earliest [_]                             = Earliest $ Sometime 0
-earliest (last . unSeries . pdf -> 0.0) = error "Canonical LatencyDistribution should always end with non-zero value"
-earliest  other                          = Earliest . Sometime . Delay . (max 0) . length . takeWhile (0==) . unSeries . pdf $ other
+earliest [0.0]  = Earliest Never
+earliest [_]    = Earliest $ Sometime 0
+earliest (last . unSeries . pdf -> 0.0) =
+  error "Canonical LatencyDistribution should always end with non-zero value"
+earliest  other = Earliest . Sometime . Delay . (max 0) . length . takeWhile (0==) . unSeries . pdf $ other
 
 onEarliest     = liftBinOp unEarliest Earliest
 
 instance TimeToCompletion Earliest where
   firstToFinish = onEarliest min
   lastToFinish  = onEarliest max
-  after         = liftBinOp (unSometimeOrNever . unEarliest) (Earliest . SometimeOrNever) (liftM2 (+))
+  after         = liftBinOp (unSometimeOrNever . unEarliest)
+                            (Earliest . SometimeOrNever) (liftM2 (+))
   delay         = Earliest . Sometime
   allLost       = Earliest Never
 ```

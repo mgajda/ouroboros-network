@@ -46,7 +46,14 @@ R_0(A) & = & 1 \\
 R_n(A) & = & 1+A*R_{n-1}(A) \\
 \end{array}
 $$
+Where:
 
+* $1$ or $\text{Id}$ denotes a unit adjacency matrix, that is matrix where every node is connected with itself but none else. And these connections have no delay at all.
+* $A$ is connection matrix, that is a matrix with zeros on a diagonal
+and distribution for a transmission from a single packet from $i$-th to $j$-th
+node. For pre-established TCP this matrix should be symmetric^[For each message,
+we send a confirmation back. When new connections are established, this symmetry
+no longer holds for nodes behind firewall.]
 
 Our key metric would be diffusion or reachability time of the network $∆R(t)$, which is conditioned
 by quality of connection curves $∆Q(t)$ and the structure network graph.
@@ -97,7 +104,7 @@ This series is called $A^{*}$ and that makes latency distribution class
 of metrics *transitive closure semirings* [@TransitiveClosureSemirings].
 
 Note that making latency distributions a proper semiring requires appropriate
-definition of $\delta{}Q$ [@NetworkReliabilityNotSemirings]
+definition of $ΔQ$ [@NetworkReliabilityNotSemirings]
 
 Also note that this series converges to $ΔQ$ on
 a single shortest path between each two nodes.
@@ -154,8 +161,11 @@ _(We can optimize this definition later, if it turns out to be bottleneck.)_
 ```{.haskell .literate}
 matMult :: (a -> a -> a) -> (a -> a -> a) -> Matrix a -> Matrix a -> Matrix a
 matMult add mul a1 a2 = assert (n' == m) $
-    matrix n m' $ \(i,j) -> foldr1 add [ (a1 ! (i,k)) `mul` (a2 ! (k,j)) | k <- [1 .. m] ]
+    matrix n m' gen
   where
+    gen (i,j) = foldr1 add
+                       [ (a1 ! (i,k)) `mul` (a2 ! (k,j))
+                         | k <- [1 .. m] ]
     n  = nrows a1
     m  = ncols a1
     n' = nrows a2
@@ -170,7 +180,8 @@ of distance between any two matrix elements.
 instance Metric a => Metric (Matrix a) where
   a `distance` b = assert ((n==n') && (m==m'))
                  $ sqrt
-                 $ sum [square ((a !(i,k)) `distance` (b ! (i,k)))  | i <- [1..n], k<-[1..m]]
+                 $ sum [square ((a !(i,k)) `distance` (b ! (i,k)))
+                         | i <- [1..n], k<-[1..m]]
     where
       square x = x*x
       n  = nrows a

@@ -187,7 +187,7 @@ extendToSameLength e (Series a, Series b) = (Series resultA, Series resultB)
         ~(bs', _  ) = go [] cs
 ```
 In a rare case (CDFs) we might also prolong by the length of the last entry:
-```
+```{.literate .haskell}
 -- | Extend both series to the same length with placeholder of last element.
 extendToSameLength' (Series a, Series b) = (Series resultA, Series resultB)
   where

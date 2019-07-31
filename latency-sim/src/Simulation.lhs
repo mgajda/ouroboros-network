@@ -1,3 +1,14 @@
+---
+input: markdown+tex_math_dollars+yaml_metadata_block+citations
+output:
+  pdf_document:
+    keep_tex: true
+    toc: true
+    toc_depth: 2
+    latex_engine: xelatex
+bibliography:
+  - Latency.bib
+---
 ```{.haskell .hidden}
 {-# LANGUAGE RankNTypes #-}
 module Simulation where
@@ -71,7 +82,7 @@ sampleSimulation' numSamples (Simulation s) = histogram <$>
     (MWC.withSystemRandom . MWC.asGenST $ sampler)
   where
     sampler :: forall s. MWC.GenST s -> ST s [Delay]
-    sampler st = replicateM numSamples $ s st -- :: ST s Delay)
+    sampler st = replicateM numSamples $ s st
 
 sampleSimulation = sampleSimulation' 10000
 ```

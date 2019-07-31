@@ -20,6 +20,8 @@ import           Test.QuickCheck.Modifiers
 import           LatencySpec hiding(spec)
 ```
 
+### Test simulations on standard distributions
+
 Now we can test that our simulations of exponential distributions behave:
 ```{.haskell .literate}
 expSim lambda = fromDistribution $ Statistics.exponential lambda
@@ -33,7 +35,8 @@ lawsOfTTCForSimulation :: Simulation -> Simulation -> Simulation -> Spec
 lawsOfTTCForSimulation l m n = describe "TimeToCompletion laws on Simulation" $ do
   prop "noDelay is the same as delay 0" $ noDelay `shouldBeSimilarByDistribution` delay 0
   describe "basic laws of convolution" $ do
-    prop "commutative"        $  (l `after` m) `shouldBeSimilarByDistribution` (m `after` l)
+    prop "commutative"        $        (l `after` m)
+       `shouldBeSimilarByDistribution` (m `after` l)
     prop "associative"        $ ((l `after` m) `after` n)
         `shouldBeSimilarByDistribution`  (l `after` (m `after` n))
     prop "delay 0 is neutral" $  (l `after` delay 0)
@@ -70,15 +73,24 @@ spec = parallel
       \(Positive lambda) (Positive mu) -> lambda>1.0 && mu>1.0 ==> ioProperty
                     ((expSim lambda `firstToFinish` expSim mu) `similarByDistribution`
                       expSim (lambda + mu))
-  prop "lastToFinish of exponentials is an sum of exponentials with parameters lambda mu and lambda+mu" $
+  prop ("lastToFinish of exponentials is an sum of exponentials with parameters"
+      <>"lambda mu and lambda+mu") $
       \(Positive lambda) (Positive mu) -> lambda>1.0 && mu>1.0 ==> ioProperty $ do
         lambdaD   <- sampleSimulation $ expSim  lambda
         muD       <- sampleSimulation $ expSim         mu
         lambdaMuD <- sampleSimulation $ expSim (lambda+mu)
         let result = LatencyDistribution (pdf lambdaD + pdf muD - pdf lambdaMuD)
-        (result `shouldBeSimilar`) <$> sampleSimulation (expSim lambda `lastToFinish` expSim mu)
-  describe "laws on TTC on Simulation samples for chosen distributions with chosen parameters" $ do
-    describe "exponential" $ lawsOfTTCForSimulation (expSim     1  ) (expSim     2  ) (expSim     3    )
-    describe "uniform"     $ lawsOfTTCForSimulation (uniformSim 1 2) (uniformSim 3 4) (uniformSim 5   6)
-    describe "uniform"     $ lawsOfTTCForSimulation (uniformSim 1 2) (expSim     2  ) (uniformSim 1   3)
+        (result `shouldBeSimilar`) <$>
+          sampleSimulation (expSim lambda `lastToFinish` expSim mu)
+  describe ("laws on TTC on Simulation samples for chosen distributions "
+          <>"with chosen parameters") $ do
+    describe "exponential" $ lawsOfTTCForSimulation (expSim     1  )
+                                                    (expSim     2  )
+                                                    (expSim     3  )
+    describe "uniform"     $ lawsOfTTCForSimulation (uniformSim 1 2)
+                                                    (uniformSim 3 4)
+                                                    (uniformSim 5 6)
+    describe "uniform"     $ lawsOfTTCForSimulation (uniformSim 1 2)
+                                                    (expSim     2  )
+                                                    (uniformSim 1 3)
 ```

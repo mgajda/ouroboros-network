@@ -24,6 +24,7 @@ import Test.Validity.Operations.Associativity
 import Test.Validity.Operations.Commutativity
 import Test.Validity.Operations.Identity
 ```
+# Appendix: validation of operations on the networks and matrices
 
 ```{.haskell .literate}
 instance Validity a => Validity (Matrix a) where
@@ -66,7 +67,12 @@ Here we have properties typical of traditional instances of `Num`:
 ```{.haskell .literate}
 specNegateIsSelfAdjoint x = negate (negate x) == x
 
-specAddOnValid :: forall a. (Show a, Eq a, Num a, Arbitrary a, GenValid a) => String -> SpecWith ()
+specAddOnValid :: forall a. (Show      a
+                            ,Eq        a
+                            ,Num       a
+                            ,Arbitrary a
+                            ,GenValid  a)
+               => String -> SpecWith ()
 specAddOnValid description =
     (describe description $ do
       prop "commutativity"             $ commutativeOnValids @a (+)
@@ -74,12 +80,18 @@ specAddOnValid description =
       -- prop "fromInteger 0 is identity" $ identityOnValid     @a (+) $ fromInteger 0 -- need to know dimensions!
     ) :: (Show a, Eq a, Num a, Arbitrary a) => SpecWith ()
 
-specMulOnValid :: forall a. (Show a, Eq a, Num a, Arbitrary a, GenValid a) => String -> SpecWith ()
+specMulOnValid :: forall a. (Show      a
+                            ,Eq        a
+                            ,Num       a
+                            ,Arbitrary a
+                            ,GenValid  a)
+               => String -> SpecWith ()
 specMulOnValid description =
     (describe description $ do
       prop "commutativity"             $ commutativeOnValids @a (*)
       prop "associativity"             $ associativeOnValids @a (*)
-      -- prop "fromInteger 1 is identity" $ identityOnValid     @a (*) $ fromInteger 1) :: (Show a, Eq a, Num a, Arbitrary a) => SpecWith ()
+      -- prop "fromInteger 1 is identity" $ identityOnValid     @a (*) $ fromInteger 1)
+      -- :: (Show a, Eq a, Num a, Arbitrary a) => SpecWith ()
       -- prop "fromInteger 0 is " $ identityOnValid     @a (*) $ fromInteger 1
     ) :: (Show a, Eq a, Num a, Arbitrary a) => SpecWith ()
 ```
@@ -97,8 +109,8 @@ spec = do
 To get specs to work we need a notion of matrix dimension.
 Note that so far we are only interested in square matrices.
 
-```{.haskell .literate}
-data MMatrix (n::Natural) a = Matrix a
+````{.haskell .literate}
+data SMatrix (n::Nat) a = Matrix a
 ```
 
 Additional tests planned:
