@@ -212,6 +212,8 @@ spec = do
         ~~  l `firstToFinish` (m `firstToFinish` n)
      prop "delay 0 is neutral" $ \l     ->  l `firstToFinish` allLost
                                         ~~ (l :: LatencyDistribution)
+  prop "distributivity" $ \l m n -> l `after` (m `firstToFinish` n)
+                                 ~~ (l `after` m) `firstToFinish` (l `after` n)
   describe "basic laws of firstToFinish" $ do
      prop "commutative"        $ \l m   -> l `lastToFinish` m
                                         ~~ m `lastToFinish` (l :: LatencyDistribution)

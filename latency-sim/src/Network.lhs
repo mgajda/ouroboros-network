@@ -96,15 +96,11 @@ algorithms executed on network matrices:
 1. If series $R_n(A)$ converges to matrix of non-zero
 (non-`allLost`) values *in all cells* in a finite number of steps,
 we consider graph to be *strongly connected* [@GeneralMethodOfShortestPaths].
-Matrix multiplication follows uses $(\mathbf{;},∨)$-modulus.
+Matrix multiplication follows uses $(\mathbf{;},∨) instead of $(*,+)$.
 (So sequential composition in place of multiplication,
   and alternative selection in place of addition.)
 
-This series is called $A^{*}$ and that makes latency distribution class
-of metrics *transitive closure semirings* [@TransitiveClosureSemirings].
-
-Note that making latency distributions a proper semiring requires appropriate
-definition of $ΔQ$ [@NetworkReliabilityNotSemirings]
+This series is called $A^{*}$.
 
 Also note that this series converges to $ΔQ$ on
 a single shortest path between each two nodes.

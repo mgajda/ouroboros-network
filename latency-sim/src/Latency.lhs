@@ -197,6 +197,11 @@ $ΔQ(t)=ΔQ_1(t)\mathbf{∨} ΔQ_2(t)$.
   $$ΔQ_1(t)∨ΔQ_2(t)=ΔQ_2(t)∨ΔQ_1(t)$$
 * *neutral element* is $0_{\mathcal{Q}}$ or `allLost`, so:
   $$ΔQ(t) ∨ 0_{\mathcal{Q}}=0_{\mathcal{Q}}∨ΔQ(t)=ΔQ(t)$$
+* *null element* of `firstToFinish` is $1_Q$:
+  $$ΔQ(t) ∨ 1_{\mathcal{Q}}=1_{\mathcal{Q}}∨ΔQ(t)=1_{\mathcal{Q}}$$
+* *monotonically increasing*:
+  $$ΔQ_1(t) ∨ ΔQ_2(t)≥ΔQ_1(t)$$
+
 
 Here is the Haskell code for naive definition of these two operations:
 We can also introduce alternative of two completion distributions.

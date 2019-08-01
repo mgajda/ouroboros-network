@@ -225,11 +225,30 @@ Note that we do not know yet how to define `fromInteger` function.
 Certainly we would like to define null and unit (neutral element) of convolution,
 but it is not clear what to do about the others:
 ```{.haskell .literate}
-seriesFromInteger     0 = [0] -- null
-seriesFromInteger     1 = [1] -- unit
 seriesFromInteger other = error
                         $ "Do not use fromInteger "
                        <> show other <> " to get Series!"
+```
+Given a *unit* and *null* elements, we can give unit and null element of
+a `Series`:
+```{.haskell .literate}
+class Unit a where
+  unitE :: a
+
+class Null a where
+  nullE :: a
+
+instance Unit Integer where
+  unitE = 1
+
+instance Null Integer where
+  nullE = 0
+
+instance Unit a => Unit (Series a) where
+  unitE = [unitE]
+
+instance Null a => Null (Series a) where
+  nullE = [nullE]
 ```
 We may be using `Series` of floating point values that are inherently approximate.
 
