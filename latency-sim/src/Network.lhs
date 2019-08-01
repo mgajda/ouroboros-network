@@ -32,35 +32,41 @@ where $i$-th row corresponds to outbound edges of node $i$,
 and $j$-th column corresponds to inbound edges of node $j$.
 So $A_{i,j}$ is $1$ when edge is connected, and $0$ if edge is not connected.
 
-Generalizing this to ΔQ-matrices, we get: any non-zero value describing
-quality of valid connection between nodes from $i$ to $j$,
-and zero value `allLost` corresponding to nodes that are not directly connected.
+It is common to store only upper triangular part of the matrix, since:
+* it is symmetric for undirected graphs
+* it should have $1$ on the diagonal, since every node is connected to itself.
 
-We can generalize simple way of checking that graph is strongly connected:
+We use this trick to avoid double counting routes with different directions.
 
-$$R_n(A)=1+A*(1+A*(1+A*...))$$
+So _network connectivity matrix_ is:
+* having nulls in the left triangular part
+* having units on the diagonal
+* having connectivitity information between $(i,j)$ for $j>i$ in element $a_{(i,j}$.
+
+Generalizing this to ΔQ-matrices we might be interesting in:
+* whether $A^n$ correctly mimicks shortest path between nodes (`Earliest`)
+* whether $A^n$ correctly keeps paths shorter than $n$
+* for a strongly connected graph there should exist $n≤\text{dim}(A)$, such that
+  $A^n$ is having non-null elements on an upper triangular section.
 
 More rigorous formulation is:
 $$ \begin{array}{rcl}
-R_0(A) & = & 1 \\
-R_n(A) & = & 1+A*R_{n-1}(A) \\
+R_0(A) & = & 1            \\
+R_n(A) & = & A*R_{n-1}(A) \\
 \end{array}
 $$
 Where:
 
 * $1$ or $\text{Id}$ denotes a unit adjacency matrix, that is matrix where every node is connected with itself but none else. And these connections have no delay at all.
-* $A$ is connection matrix, that is a matrix with zeros on a diagonal
+* $A$ is connection matrix as defined above,
 and distribution for a transmission from a single packet from $i$-th to $j$-th
-node. For pre-established TCP this matrix should be symmetric^[For each message,
-we send a confirmation back. When new connections are established, this symmetry
-no longer holds for nodes behind firewall.]
+node. For pre-established TCP this matrix should be symmetric.
 
 Our key metric would be diffusion or reachability time of the network $∆R(t)$, which is conditioned
 by quality of connection curves $∆Q(t)$ and the structure network graph.
 
 Later in this section, we discuss on how $∆R(t)$ encompasses other plausible
 performance conditions on the network.
-
 
 ### Reachability of network broadcast or ∆R(t)
 
