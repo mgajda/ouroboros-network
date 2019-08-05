@@ -206,10 +206,6 @@ spec = do
 To get specs to work we need a notion of matrix dimension.
 Note that so far we are only interested in square matrices.
 
-````{.haskell .literate}
-data ConnMatrix (n::Nat) a = Matrix a
-```
-
 Additional tests planned:
 
 * behaviour of a `Matrix Int`

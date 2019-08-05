@@ -119,19 +119,16 @@ or optimal diffusion matrix.
 ```{.haskell .literate}
 -- | This computes optimal connections on $\deltaQ{}$ matrix.
 --   TODO: Check that it works both for boolean matrices, and $\deltaQ{}$.
-optimalConnections a = fix step a
+optimalConnections a = converges 1000 step a
   where
     step r = r+a |*| r
 
-fix step r = if r `almostEqual` r'
-           then          r
-           else fix step r'
+converges 0      step r = error "Solution did not converge"
+converges aLimit step r = if r ~~ r'
+                            then                           r
+                            else converges (aLimit-1) step r'
   where
     r' = step r
-    almostEqual :: Metric a => a -> a -> Bool
-    almostEqual a1 a2 = (a1 `distance` a2)<=epsilon
-      where
-        epsilon=0.001
 ```
 
 We will use this to define *path with shortest ΔQ*.
