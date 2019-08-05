@@ -9,6 +9,7 @@ import Series hiding(spec)
 import Latency
 import LatencySpec hiding(spec)
 import LatencyEstimates
+import Metric
 
 import Test.QuickCheck
 import Test.QuickCheck.All

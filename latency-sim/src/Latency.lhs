@@ -1,13 +1,4 @@
 ---
-author:
-  - Michał J. Gajda
-  - Karl      Knutsson
-  - Duncan    Coutts
-  - Marcin    Szamotulski
-title: Curious properties of latency distributions
-abstract: |
-  Network latency distributions, their algebra, and use examples.
-date: June 25 2019, v1.9
 input: markdown+tex_math_dollars+yaml_metadata_block+citations
 output:
   pdf_document:
@@ -52,6 +43,8 @@ import Test.QuickCheck
 import Probability
 import Delay
 import Series
+import Metric
+import NullUnit
 
 ```
 # Latency distributions

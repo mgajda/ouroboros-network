@@ -23,6 +23,7 @@ module NetworkSpec where
 import Latency
 import Network
 import Series
+import NullUnit
 
 import Control.Monad
 import Data.Matrix
@@ -41,7 +42,6 @@ import Test.Validity
 import Test.Validity.Operations.Associativity
 import Test.Validity.Operations.Commutativity
 import Test.Validity.Operations.Identity
-
 ```
 
 # Appendix: validation of operations on the networks and matrices
@@ -52,12 +52,6 @@ in connection matrices. They have the following properties:
 * they always have unit distribution (`noDelay`) on the diagonal
 
 ```{.haskell .literate}
-instance Unit Int where
-  unitE = 1
-
-instance Null Int where
-  nullE = 0
-
 instance (Unit            a
          ,Eq              a
          ,Validity        a)
@@ -88,15 +82,21 @@ instance (Unit              a
 ```
 To generate connection matrix of size $n$:
 ```{.haskell .literate}
+genConnMatrix :: (Arbitrary  a
+                 ,Unit       a)
+              => Int
+              -> Gen (Matrix a)
 genConnMatrix n = do
   fromList n n <$> -- we are interested in square matrices only
-    sequence [genConnElt i k | i<-[1..n], k<-[1..n]]
+    sequence [genConnElt i k | i<-[1..n]
+                             , k<-[1..n]]
 ```
 When we are interested in generating multiple matrices of the same size,
 we can generate a generate for a random size:
 ```{.haskell .literate}
-genGenConnMatrix :: (Unit a
-                    ,Null a)
+genGenConnMatrix :: (Unit             a
+                    ,Null             a
+                    ,Arbitrary        a)
                  =>  Gen (Gen (Matrix a))
 genGenConnMatrix  = do
   Positive n <- arbitrary
@@ -105,11 +105,13 @@ genGenConnMatrix  = do
 
 Generation of element in connection matrix depends on index:
 ```{.haskell .literate}
-genConnElt  i j | i == j = return unitE
-genConnElt _ _           = arbitrary
+genConnElt i j | i == j = return unitE
+genConnElt _ _          = arbitrary
 
 elements a = map (a!) $ indices a
-indices a = [(i,k) | i<-[1..n], k<-[1..m]]
+
+indices a = [(i,k) | i<-[1..n]
+                   , k<-[1..m]]
   where
     n = nrows a
     m = ncols a
@@ -194,11 +196,11 @@ spec = do
   shrinkValidSpec @(Matrix Int)
   arbitrarySpec   @(Matrix Int)
   describe "check properties of integers" $ do
-    specAddOnGen  $ pure arbitrary
-    specMulOnGen  $ pure arbitrary
-  describe "check properties of matrices of integers" $ do
-    specAddOnGen  $ genGenConnMatrix @Int
-    specMulOnGen  $ genGenConnMatrix @Int
+    specAddOnGen  $ pure (arbitrary :: Gen Integer)
+    specMulOnGen  $ pure (arbitrary :: Gen Integer)
+  {-describe "check properties of matrices of integers" $ do
+    specAddOnGen  $ genGenConnMatrix @Integer
+    specMulOnGen  $ genGenConnMatrix @Integer-}
 ```
 
 To get specs to work we need a notion of matrix dimension.

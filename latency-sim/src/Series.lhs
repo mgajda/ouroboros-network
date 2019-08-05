@@ -1,13 +1,4 @@
 ---
-author:
-  - Michał J. Gajda
-  - Karl      Knutsson
-  - Duncan    Coutts
-  - Marcin    Szamotulski
-title: Curious properties of latency distributions
-abstract: |
-  Network latency distributions, their algebra, and use examples.
-date: June 25 2019, v1.9
 input: markdown+tex_math_dollars+yaml_metadata_block+citations
 output:
   pdf_document:
@@ -40,6 +31,8 @@ import Data.Foldable
 import Data.Semigroup
 
 import Delay
+import NullUnit
+import Metric
 
 import Test.QuickCheck
 import Test.QuickCheck.All
@@ -230,20 +223,9 @@ seriesFromInteger other = error
                        <> show other <> " to get Series!"
 ```
 Given a *unit* and *null* elements, we can give unit and null element of
-a `Series`:
+a `Series`. ^[Note that we in this context we are mainly interested in null
+and unit of multiplication.]
 ```{.haskell .literate}
-class Unit a where
-  unitE :: a
-
-class Null a where
-  nullE :: a
-
-instance Unit Integer where
-  unitE = 1
-
-instance Null Integer where
-  nullE = 0
-
 instance Unit a => Unit (Series a) where
   unitE = [unitE]
 
@@ -264,18 +246,6 @@ square x = x*x
 ```
 Note that generous similarity threshold of `0.001` is due to limited
 number of simulations we run when checking distributions (10k by default).
-
-`Metric` class is a pretty typical for similarity measurement:
-```{.haskell .literate}
-class Metric a where
-  distance :: a -> a -> Double
-  similarityThreshold :: Double
-
-infix 3 ~~
-
-(~~) :: Metric t => t -> t -> Bool
-(~~) (a::t) (b::t) = distance a b < similarityThreshold @t
-```
 
 ```{.haskell .literate .hidden}
 spec = quickCheckAll

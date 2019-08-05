@@ -27,9 +27,10 @@ import Data.Typeable
 import Data.Validity
 import Data.GenValidity
 
+import Latency
+import Metric
 import Probability
 import Series
-import Latency
 
 import ProbabilitySpec
 import Latency.SeriesSpec
@@ -57,11 +58,11 @@ Indexing starts at 0 (which means: no delay.)
 ```{.haskell .literate}
 -- | Validity criteria for latency distributions
 isValidLD :: LatencyDistribution -> Bool
-isValidLD []                             = False
+isValidLD [ ] = False
 ```
 Any distribution with a single-element domain is valid (even if the value is 0.0)
 ```{.haskell .literate}
-isValidLD [p]                            = isValidProbability p
+isValidLD [p] = isValidProbability p
 ```
 Any distribution with more than one element and last element of zero is invalid (to prevent redundant representations.)
 ```{.haskell .literate}
@@ -69,11 +70,11 @@ isValidLD (last . unSeries . pdf -> 0.0) = False
 ```
 Sum of probabilities shall never exceed 1.0
 ```{.haskell .literate}
-isValidLD (pdf -> probs)                 = sum probs <= Prob 1.0
+isValidLD (pdf -> probs) = sum probs <= Prob 1.0
 ```
 Each value must be valid value for probability:
 ```{.haskell .literate}
-isValidLD (pdf -> probs)                 = all isValidProbability probs
+isValidLD (pdf -> probs) = all isValidProbability probs
 ```
 
 We use QuickCheck [@quickcheck] to generate random distribution for testing:
@@ -212,8 +213,6 @@ spec = do
         ~~  l `firstToFinish` (m `firstToFinish` n)
      prop "delay 0 is neutral" $ \l     ->  l `firstToFinish` allLost
                                         ~~ (l :: LatencyDistribution)
-  prop "distributivity" $ \l m n -> l `after` (m `firstToFinish` n)
-                                 ~~ (l `after` m) `firstToFinish` (l `after` n)
   describe "basic laws of firstToFinish" $ do
      prop "commutative"        $ \l m   -> l `lastToFinish` m
                                         ~~ m `lastToFinish` (l :: LatencyDistribution)

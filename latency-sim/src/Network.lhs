@@ -1,5 +1,8 @@
 ---
 input: markdown+tex_math_dollars+yaml_metadata_block+citations
+header-includes: |
+  \usepackage{bbm}
+  \usepackage{bbold}
 output:
   pdf_document:
     keep_tex: true
@@ -23,6 +26,8 @@ import GHC.TypeNats
 
 import Series
 import Latency
+import Metric
+import NullUnit
 ```
 
 # Representing networks
@@ -39,25 +44,24 @@ It is common to store only upper triangular part of the matrix, since:
 We use this trick to avoid double counting routes with different directions.
 
 So _network connectivity matrix_ is:
-* having nulls in the left triangular part
 * having units on the diagonal
-* having connectivitity information between $(i,j)$ for $j>i$ in element $a_{(i,j}$.
+* having connectivitity information between nodes $i$, and $j$, for $j>i$ in element $a_{i,j}$.
 
 Generalizing this to ΔQ-matrices we might be interesting in:
 * whether $A^n$ correctly mimicks shortest path between nodes (`Earliest`)
 * whether $A^n$ correctly keeps paths shorter than $n$
-* for a strongly connected graph there should exist $n≤\text{dim}(A)$, such that
+* for a strongly connected graph there should exist $n≤\mathop{dim}(A)$, such that
   $A^n$ is having non-null elements on an upper triangular section.
 
 More rigorous formulation is:
 $$ \begin{array}{rcl}
-R_0(A) & = & 1            \\
-R_n(A) & = & A*R_{n-1}(A) \\
+R_0(A) & = & \mathit{1} \\
+R_n(A) & = & R_{n-1}(A)*A \\
 \end{array}
 $$
 Where:
 
-* $1$ or $\text{Id}$ denotes a unit adjacency matrix, that is matrix where every node is connected with itself but none else. And these connections have no delay at all.
+* $\mathit{1}$ or $\mathop{Id}$ denotes a unit adjacency matrix, that is matrix where every node is connected with itself but none else. And these connections have no delay at all.
 * $A$ is connection matrix as defined above,
 and distribution for a transmission from a single packet from $i$-th to $j$-th
 node. For pre-established TCP this matrix should be symmetric.
@@ -102,11 +106,11 @@ algorithms executed on network matrices:
 1. If series $R_n(A)$ converges to matrix of non-zero
 (non-`allLost`) values *in all cells* in a finite number of steps,
 we consider graph to be *strongly connected* [@GeneralMethodOfShortestPaths].
-Matrix multiplication follows uses $(\mathbf{;},∨) instead of $(*,+)$.
+Matrix multiplication follows uses $(\mathbf{;},∨)$ instead of $(*,+)$.
 (So sequential composition in place of multiplication,
   and alternative selection in place of addition.)
 
-This series is called $A^{*}$.
+When it exists, limit of the series $R_n(A)=A^n$ is called $A^{*}$.
 
 Also note that this series converges to $ΔQ$ on
 a single shortest path between each two nodes.
@@ -132,8 +136,7 @@ fix step r = if r `almostEqual` r'
 
 We will use this to define *path with shortest ΔQ*.
 It corresponds to the situation where all nodes broadcast value from
-any starting point $i$ for the duration of $n$ retransmissions.
-^[That we do not reduce loss over remainder yet?]
+any starting point $i$ for the duration of $n$ retransmissions. ^[That we do not reduce loss over remainder yet?]
 
 2. Considering two nodes we may consider delay introduced by
    retransmissions in naive miniprotocol:
@@ -143,6 +146,7 @@ any starting point $i$ for the duration of $n$ retransmissions.
    * the message is *resent* if *receiver* fails to send back confirmation
      of receipt
    ...
+
    Assuming latency of the connection $l$, and timeout $t>d(l)$, we get simple
    solution:
    $$ \mu{}X.l\mathbf{;}l\mathbf{;}X $$
@@ -179,7 +183,8 @@ between two matrices.
 Here, we use Frobenius distance between matrices, parametrized by the notion
 of distance between any two matrix elements.
 ```{.haskell .literate}
-instance Metric a => Metric (Matrix a) where
+instance Metric         a
+      => Metric (Matrix a) where
   a `distance` b = assert ((n==n') && (m==m'))
                  $ sqrt
                  $ sum [square ((a !(i,k)) `distance` (b ! (i,k)))
