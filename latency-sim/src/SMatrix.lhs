@@ -12,6 +12,9 @@ bibliography:
 ```{.haskell .hidden}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE DeriveTraversable       #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
@@ -26,47 +29,55 @@ module SMatrix where
 
 import Control.Exception(assert)
 import Data.Proxy
+import Data.Typeable
+import GHC.Generics
 import GHC.TypeLits
 import GHC.Exts(Proxy#)
 
 import NullUnit
 import qualified Data.Matrix as DM
 ```
-## Square matrices of fixed size
+## Square matrices of ©ed size
 
 This is a simple description of square matrices
 with fixed size.
 
 ````{.haskell .literate}
-data SMatrix (n::Nat) a where
-  SMatrix :: KnownNat n => proxy n -> DM.Matrix a -> SMatrix n a
+newtype SMatrix (n::Nat) a = SMatrix { unSMatrix :: DM.Matrix a }
+  deriving (Show, Eq, Functor, Applicative
+           ,Foldable, Traversable, Typeable, Generic)
 ```
 
 ```{.haskell .literate}
-intVal :: KnownNat n => proxy n -> Int
-intVal  = fromInteger . natVal
+size :: KnownNat n => SMatrix n a -> Int
+size (s :: SMatrix n a)= intVal (Proxy @n)
+
+intVal :: KnownNat n => Proxy n -> Int
+intVal = fromIntegral . natVal
 
 sMakeMinor ::  KnownNat n
            => (Int, Int)
            -> SMatrix  n    a
            -> SMatrix (n-1) a
-sMakeMinor (i,j) (SMatrix (intVal -> n) m) | i>intVal n || j>intVal n = error "Unavailable coordinates"
-sMakeMinor (i,j) (SMatrix (intVal -> n) m) = SMatrix Proxy# (DM.minorMatrix i j m)
+sMakeMinor (i,j) (size -> n) | i>n || j>n = error "Unavailable coordinates"
+sMakeMinor (i,j) (SMatrix m) = SMatrix (DM.minorMatrix i j m)
 
 sFromList :: KnownNat n => Proxy n -> [a] -> SMatrix n a
-sFromList (natVal -> n) aList =
-  assert (length aList == natVal n*natVal n) $
-    DM.fromList n n aList
+sFromList (intVal -> n) aList =
+  assert (length aList == n*n) $
+    SMatrix $
+      DM.fromList n n aList
 
-(SMatrix n _) ! (i,_) | i>intVal n || i<=0 = error $ "Row unavailable:"    ++ show i
-(SMatrix n _) ! (_,j) | j>intVal n || j<=0 = error $ "Column unavailable:" ++ show j
-(SMatrix n m) ! (i,j) = m ! (i,j)
+(size -> n) ! (i,_) | i>n || i<=0 = error $ "Row unavailable:"    ++ show i
+(size -> n) ! (_,j) | j>n || j<=0 = error $ "Column unavailable:" ++ show j
+(SMatrix m) ! (i,j)               = m DM.! (i,j)
 
-sNRows (SMatrix n _) = intVal n
-sNCols (SMatrix n _) = intVal n
+nrows (size -> n) = n
+ncols (size -> n) = n
 
-sMatrix n gen = SMatrix n
-              $ DM.matrix n n gen
+sMatrix :: KnownNat n => Proxy n -> ((Int, Int)->a) -> SMatrix n a
+sMatrix (intVal -> n) gen = SMatrix
+                          $ DM.matrix n n gen
 ```
 Ops to be implemented:
 * makeMinor +
