@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TypeApplications           #-}
-module Latency.SeriesSpec(spec) where
+module SeriesSpec(spec) where
 
 import Data.Validity
 import Data.GenValidity
