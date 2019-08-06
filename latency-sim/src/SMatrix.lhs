@@ -33,6 +33,7 @@ import Data.Typeable
 import GHC.Generics
 import GHC.TypeLits
 import GHC.Exts(Proxy#)
+import Numeric.Natural
 
 import NullUnit
 import qualified Data.Matrix as DM
@@ -43,6 +44,28 @@ This is a simple description of square matrices
 with fixed size.
 
 ````{.haskell .literate}
+newtype UpTo (n::Nat) = UpTo { unUpTo :: Natural }
+  deriving (Eq, Ord, Num)
+
+upTo' :: KnownNat n => Proxy n -> Int -> UpTo n
+upTo' n i | i > fromEnum (natVal n) =
+  error $ "Value " ++ show i
+       ++ " larger than limit of " ++ show (natVal n)
+upTo' n i = UpTo (toEnum i)
+
+upTo :: KnownNat n => Int -> UpTo n
+upTo = upTo' Proxy
+
+instance KnownNat n => Enum (UpTo n) where
+  fromEnum (UpTo n) = fromEnum n
+  toEnum            = upTo . toEnum
+  enumFromTo (UpTo a) (UpTo b) = UpTo <$> enumFromTo a b
+  succ u@(UpTo a :: UpTo n) | a == upToLimit u = error "No successor in UpTo"
+  succ (UpTo a :: UpTo n) = UpTo $ succ a
+
+upToLimit :: KnownNat n => UpTo n -> Natural
+upToLimit (_ :: UpTo n)= toEnum $ fromIntegral $ natVal (Proxy @n)
+
 newtype SMatrix (n::Nat) a = SMatrix { unSMatrix :: DM.Matrix a }
   deriving (Show, Eq, Functor, Applicative
            ,Foldable, Traversable, Typeable, Generic)
