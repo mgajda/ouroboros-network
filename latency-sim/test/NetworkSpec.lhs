@@ -70,7 +70,7 @@ instance (Unit              a
          ,Arbitrary         a)
       =>  Arbitrary (Matrix a) where
   arbitrary = do
-      Positive n <- arbitrary -- size constraint here? sqrt?
+      n <- choose (1,20) -- No change expected for larger matrices
       genConnMatrix n
 
   shrink a | nrows a == 1 = []
@@ -99,7 +99,7 @@ genGenConnMatrix :: (Unit             a
                     ,Arbitrary        a)
                  =>  Gen (Gen (Matrix a))
 genGenConnMatrix  = do
-  Positive n <- arbitrary
+  n <- choose (1,20)
   return      $ genConnMatrix n
 ```
 

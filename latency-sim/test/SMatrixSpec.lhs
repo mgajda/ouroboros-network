@@ -19,6 +19,7 @@ bibliography:
 {-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE PartialTypeSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TypeApplications           #-}
@@ -43,6 +44,23 @@ import Test.Hspec
 data GenSomeSMatrix a =
   forall n. KnownNat                     n
          => GenSomeSMatrix (Gen (SMatrix n a))
+
+data SomeSMatrix a =
+   forall n. KnownNat             n
+          => SomeSMatrix (SMatrix n a)
+
+instance Arbitrary SomeNat where
+  arbitrary = do
+    Positive a <- arbitrary
+    case someNatVal a of
+      Nothing -> error "Impossible when generating SomeNat"
+      Just n  -> return n
+
+instance Arbitrary              a
+      => Arbitrary (SomeSMatrix a) where
+  arbitrary = do
+    randomSize <- arbitrary
+    sMatrixOfSize randomSize
 
 instance Arbitrary (GenSomeSMatrix a) where
   arbitrary = undefined
@@ -71,6 +89,12 @@ data Together3 a b c =
 smatrixGen = do
   Positive n <- arbitrary
   return $ someNatVal n
+
+sMatrixOfSize :: Arbitrary a
+              => SomeNat -> Gen (SomeSMatrix a)
+sMatrixOfSize aSize = case aSize of
+  SomeNat (Proxy :: Proxy n) ->
+    SomeSMatrix <$> (arbitrary :: Gen (SMatrix n _))
 
 spec = do
   it "truthy" $ True `shouldBe` True
