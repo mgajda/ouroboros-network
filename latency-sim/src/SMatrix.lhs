@@ -79,11 +79,10 @@ intVal :: KnownNat n => Proxy n -> Int
 intVal = fromIntegral . natVal
 
 sMakeMinor ::  KnownNat n
-           => (Int, Int)
+           => (UpTo n, UpTo n)
            -> SMatrix  n    a
            -> SMatrix (n-1) a
-sMakeMinor (i,j) (size -> n) | i>n || j>n = error "Unavailable coordinates"
-sMakeMinor (i,j) (SMatrix m) = SMatrix (DM.minorMatrix i j m)
+sMakeMinor (i,j) (SMatrix m) = SMatrix (DM.minorMatrix (fromEnum i) (fromEnum j) m)
 
 sFromList :: KnownNat n => Proxy n -> [a] -> SMatrix n a
 sFromList (intVal -> n) aList =
@@ -91,16 +90,15 @@ sFromList (intVal -> n) aList =
     SMatrix $
       DM.fromList n n aList
 
-(size -> n) ! (i,_) | i>n || i<=0 = error $ "Row unavailable:"    ++ show i
-(size -> n) ! (_,j) | j>n || j<=0 = error $ "Column unavailable:" ++ show j
-(SMatrix m) ! (i,j)               = m DM.! (i,j)
+(!) :: KnownNat n => SMatrix n a -> (UpTo n, UpTo n) -> a
+(SMatrix m) ! (i,j) = m DM.! (fromEnum i,fromEnum j)
 
 nrows (size -> n) = n
 ncols (size -> n) = n
 
-sMatrix :: KnownNat n => Proxy n -> ((Int, Int)->a) -> SMatrix n a
+sMatrix :: KnownNat n => Proxy n -> ((UpTo n, UpTo n)->a) -> SMatrix n a
 sMatrix (intVal -> n) gen = SMatrix
-                          $ DM.matrix n n gen
+                          $ DM.matrix n n (\(i,j) -> gen (upTo i, upTo j))
 ```
 Ops to be implemented:
 * makeMinor +
