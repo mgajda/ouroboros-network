@@ -38,11 +38,11 @@ import Numeric.Natural
 import NullUnit
 import qualified Data.Matrix as DM
 ```
-## Square matrices of ©ed size
+## Square matrices of declared size
 
 This is a simple description of square matrices
-with fixed size.
-
+with fixed size ^[Note that we considered using `matrix-static`, but it does not have typesafe indexing.].
+First we need natural indices that are no larger than $n$:
 ````{.haskell .literate}
 newtype UpTo (n::Nat) = UpTo { unUpTo :: Natural }
   deriving (Eq, Ord, Num)
@@ -100,10 +100,20 @@ sMatrix :: KnownNat n => Proxy n -> ((UpTo n, UpTo n)->a) -> SMatrix n a
 sMatrix (intVal -> n) gen = SMatrix
                           $ DM.matrix n n (\(i,j) -> gen (upTo i, upTo j))
 ```
-Ops to be implemented:
-* makeMinor +
-* fromList n m [..] +
-* (!) +
-* matrix n m gen
-* nrows
-* ncols
+
+We also need to identity and null matrices (for multiplication):
+```{.haskell .literate}
+instance (KnownNat      n
+         ,Null            a)
+      =>  Null (SMatrix n a) where
+  nullE = sMatrix Proxy (\_ -> nullE)
+
+instance (KnownNat      n
+         ,Null            a
+         ,Unit            a)
+      =>  Unit (SMatrix n a) where
+  unitE = sMatrix Proxy elt
+    where
+      elt (i,j) | i == j = unitE
+      elt (i,j)          = nullE
+```

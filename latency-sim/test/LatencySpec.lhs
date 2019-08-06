@@ -33,7 +33,7 @@ import Probability
 import Series
 
 import ProbabilitySpec
-import Latency.SeriesSpec
+import SeriesSpec
 
 import Test.QuickCheck.Gen(sized, choose)
 import Test.QuickCheck((==>))

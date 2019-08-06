@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module Latency.LatencyEstimatesSpec(spec) where
+module LatencyEstimatesSpec(spec) where
 
 import Delay
 import Probability

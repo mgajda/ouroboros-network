@@ -1,3 +1,14 @@
+---
+input: markdown+tex_math_dollars+yaml_metadata_block+citations
+output:
+  pdf_document:
+    keep_tex: true
+    toc: true
+    toc_depth: 2
+    latex_engine: xelatex
+bibliography:
+  - Latency.bib
+---
 ```{.haskell .hidden}
 {-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE FlexibleContexts           #-}
