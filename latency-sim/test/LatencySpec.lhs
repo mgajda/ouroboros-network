@@ -10,14 +10,14 @@ bibliography:
   - Latency.bib
 ---
 ```{.haskell .hidden}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE AllowAmbiguousTypes        #-}
+{-# LANGUAGE ExplicitForAll             #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving  #-}
-{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE OverloadedLists            #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE ViewPatterns               #-}
 module LatencySpec where
 
 import GHC.Exts(IsList(..))
@@ -70,7 +70,7 @@ isValidLD (last . unSeries . pdf -> 0.0) = False
 ```
 Sum of probabilities shall never exceed 1.0
 ```{.haskell .literate}
-isValidLD (pdf -> probs) = sum probs <= Prob 1.0
+isValidLD ((1.0<) . sum . pdf -> True) = False
 ```
 Each value must be valid value for probability:
 ```{.haskell .literate}

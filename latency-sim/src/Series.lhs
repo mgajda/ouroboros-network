@@ -122,7 +122,7 @@ _ .* (Series []    ) = Series []
 ```
 $$ F(t)=f_0*t^0+f_1*t^1+f_2*t^2+...+f_n*t^n $$
 Convolution:
-$$F(t)*G(t)=\Sigma_{0}^t x^t*(f_0*g_t+f_1*g_{t-1}+...+g_0*f_t) $$
+$$F(t)*G(t)=\Sigma_{\tau=0}^t x^t*f(\tau)*g(t-\tau) $$
 Wikipedia's definition:
 $$(f * g)(t) \triangleq\ \int_{-\infty}^\infty f(\tau) g(t - \tau) \, d\tau.$$
 Distribution is from $0$ to $+\infty$:
@@ -139,7 +139,8 @@ $$(f * g)(t) \triangleq\ \Sigma_{0}^\infty f(\tau) g(t - \tau)$$
 $$(f * g)(t) \triangleq\ \Sigma_{0}^{n} f_{\tau} g_{t - \tau}.$$
 
 Resulting in convolution:
-$$F(t)*G(t)=Σ_{0}^t x^t*(f_0*g_t+f_1*g_{t-1}+...+g_0*f_t) $$
+$$F(t)*G(t)=Σ_{\tau{}=0}^t x^t*f(\tau)*g(t-
+\tau) $$
 
 
 ```{.haskell .literate}
@@ -245,7 +246,8 @@ instance Real           a
 square x = x*x
 ```
 Note that generous similarity threshold of `0.001` is due to limited
-number of simulations we run when checking distributions (10k by default).
+number of simulations we can quickly run when checking distributions
+in the unit tests (10k by default).
 
 ```{.haskell .literate .hidden}
 spec = quickCheckAll

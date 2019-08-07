@@ -45,7 +45,7 @@ with fixed size ^[Note that we considered using `matrix-static`, but it does not
 First we need natural indices that are no larger than $n$:
 ````{.haskell .literate}
 newtype UpTo (n::Nat) = UpTo { unUpTo :: Natural }
-  deriving (Eq, Ord, Num)
+  deriving (Eq, Ord, Num, Typeable)
 
 upTo' :: KnownNat n => Proxy n -> Int -> UpTo n
 upTo' n i | i > fromEnum (natVal n) =
@@ -68,7 +68,7 @@ upToLimit (_ :: UpTo n)= toEnum $ fromIntegral $ natVal (Proxy @n)
 
 newtype SMatrix (n::Nat) a = SMatrix { unSMatrix :: DM.Matrix a }
   deriving (Show, Eq, Functor, Applicative
-           ,Foldable, Traversable, Typeable, Generic)
+           ,Foldable, Traversable,  Typeable, Generic)
 ```
 
 ```{.haskell .literate}

@@ -13,7 +13,9 @@ bibliography:
 ```{.haskell .hidden}
 {-# LANGUAGE AllowAmbiguousTypes        #-}
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE ExistentialQuantification  #-}
@@ -26,17 +28,21 @@ bibliography:
 module SMatrixSpec where
 
 import Control.Monad(liftM2, liftM3)
+import Data.Data
+import Data.GenValidity
 import Data.Proxy
 import Data.Traversable
+import Data.Typeable
 import GHC.TypeLits
 
-import NullUnit
-import SMatrix
-
+import qualified Data.Matrix as DM
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Modifiers
 import Test.Hspec
+
+import NullUnit
+import SMatrix
 ```
 
 
@@ -48,6 +54,35 @@ data GenSomeSMatrix a =
 data SomeSMatrix a =
    forall n. KnownNat             n
           => SomeSMatrix (SMatrix n a)
+    deriving (Typeable)
+
+instance Eq a => Eq (SomeSMatrix a) where
+  SomeSMatrix a == SomeSMatrix b = False
+
+instance Show a => Show (SomeSMatrix a) where
+  showsPrec _ (SomeSMatrix sm) = ("SMatrix " ++) . shows sm
+
+instance Validity            a
+      => Validity (DM.Matrix a) where
+  validate sm = foldMap validate sm
+
+instance (Validity            a
+         ,KnownNat          n  )
+      =>  Validity (SMatrix n a) where
+  validate (SMatrix sm) = validate sm
+
+instance Validity              a
+      => Validity (SomeSMatrix a) where
+  validate (SomeSMatrix sm) = validate sm
+
+instance Arbitrary                 a
+      => GenUnchecked (SomeSMatrix a) where
+  genUnchecked    = arbitrary
+  shrinkUnchecked = shrink
+
+instance (GenValid              a
+         ,Arbitrary             a)
+      =>  GenValid (SomeSMatrix a) where
 
 instance Arbitrary SomeNat where
   arbitrary = do
@@ -96,11 +131,22 @@ sMatrixOfSize aSize = case aSize of
   SomeNat (Proxy :: Proxy n) ->
     SomeSMatrix <$> (arbitrary :: Gen (SMatrix n _))
 
+test = u == u
+  where
+    u :: SMatrix 4 Int
+    u = undefined
+
+numMatrix :: Int -> SMatrix 1 Int
+numMatrix a = sMatrix (Proxy :: Proxy 1) $ const a
+
 spec = do
+  describe "Example operations on SMatrices" $ do
+    it "SMatrix of size 1 is just a number" $ do
+      numMatrix 1 == numMatrix 1
   it "truthy" $ True `shouldBe` True
-  --eqSpecOnValid   @(SMatrix 3 Int)
-  --shrinkValidSpec @(SMatrix 3 Int)
-  --arbitrarySpec   @(SMatrix 3 Int)
+  --eqSpecOnValid @(SMatrix 4 Int)
+  --shrinkValidSpec @(SomeSMatrix Integer)
+  --arbitrarySpec   @(SomeSMatrix Integer)
   {-describe "check properties of integers" $ do
     specAddOnGen  $ pure (arbitrary :: Gen Integer)
     specMulOnGen  $ pure (arbitrary :: Gen Integer)

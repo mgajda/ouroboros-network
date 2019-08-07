@@ -7,7 +7,7 @@ OPTS="--filter=pandoc-citeproc --filter=pandoc-hide-codeblocks --bibliography=La
 #DOCOPTS='--filter=pandoc-hide-codeblocks '
 
 echo "Making hide-codeblocks filter"
-stack install latency-sim:exe:pandoc-hide-codeblocks # for `hide-codeblocks`
+stack build latency-sim:exe:pandoc-hide-codeblocks # for `hide-codeblocks`
 
 echo "Making TEX"
 stack exec -- pandoc ${OPTS} ${DOCOPTS}          --variable mainfont="DejaVu Serif" --variable sansfont="DejaVu Sans" --standalone --to=latex ${INPUTS} -o ${NAME}.tex
