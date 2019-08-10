@@ -102,12 +102,14 @@ genGenConnMatrix :: (Unit             a
                  =>  Gen (GenIN (Matrix a))
 genGenConnMatrix  = do
   n <- choose (1,20)
-  return $ GenIN { genTest=genConnMatrix n
-                 , genUnit = matrix n n unitElt
-                 , genNull = matrix n n (\_-> nullE)
+  return $ GenIN { genTest = genConnMatrix n
+                 , genUnit = unitSized     n
+                 , genNull = nullSized     n
                  }
 
 unitSized n = matrix n n unitElt
+
+nullSized n = matrix n n $ const nullE
 
 unitElt (i,j) | i==j = unitE
 unitElt _            = nullE
@@ -205,16 +207,17 @@ identityWithGenIN op genIn = do
 specAddOnGen :: forall a. (Show      a
                           ,Eq        a
                           ,Num       a
-                          ,Null      a
                           ,Arbitrary a
                           ,GenValid  a)
              => Gen (GenIN a) -> SpecWith ()
 specAddOnGen genIN = specACIOnGenGen (+) genIN "addition"
 
+```
+Or should I use `forAllShrink :: (Show a, Testable prop) => Gen a -> (a -> [a]) -> (a -> prop) -> Property`?
+```{.haskell .literate}
 specMulOnGen :: forall a. (Show      a
                           ,Eq        a
                           ,Num       a
-                          ,Unit      a
                           ,Arbitrary a
                           ,GenValid  a)
              => Gen (GenIN a)
@@ -233,9 +236,9 @@ spec = do
   describe "check properties of integers" $ do
     specAddOnGen  $ pure $ GenIN (arbitrary :: Gen Integer) 1 0
     specMulOnGen  $ pure $ GenIN (arbitrary :: Gen Integer) 1 0
-  {-describe "check properties of matrices of integers" $ do
+  describe "check properties of matrices of integers" $ do
     specAddOnGen  $ genGenConnMatrix @Integer
-    specMulOnGen  $ genGenConnMatrix @Integer-}
+    specMulOnGen  $ genGenConnMatrix @Integer
 ```
 
 To get specs to work we need a notion of matrix dimension.
