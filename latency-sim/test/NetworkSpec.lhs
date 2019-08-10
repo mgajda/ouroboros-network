@@ -15,6 +15,7 @@ bibliography:
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TypeApplications           #-}
@@ -26,6 +27,7 @@ import Series
 import NullUnit
 
 import Control.Monad
+import Control.Exception(assert)
 import Data.Matrix
 import Data.Ratio
 import Data.Validity
@@ -97,10 +99,18 @@ we can generate a generate for a random size:
 genGenConnMatrix :: (Unit             a
                     ,Null             a
                     ,Arbitrary        a)
-                 =>  Gen (Gen (Matrix a))
+                 =>  Gen (GenIN (Matrix a))
 genGenConnMatrix  = do
   n <- choose (1,20)
-  return      $ genConnMatrix n
+  return $ GenIN { genTest=genConnMatrix n
+                 , genUnit = matrix n n unitElt
+                 , genNull = matrix n n (\_-> nullE)
+                 }
+
+unitSized n = matrix n n unitElt
+
+unitElt (i,j) | i==j = unitE
+unitElt _            = nullE
 ```
 
 Generation of element in connection matrix depends on index:
@@ -137,35 +147,60 @@ instance (Unit             a
 
 Here we have properties typical of traditional instances of `Num`:
 ```{.haskell .literate}
+identityWithGen :: Gen (Gen a, a) -> Property
+identityWithGen = undefined
+
 specNegateIsSelfAdjoint x = negate (negate x) == x
+
+-- | Generator of both generator, null, and identity.
+data GenIN a =
+  GenIN {
+    genTest :: Gen a
+  , genUnit :: a
+  , genNull :: a
+  }
 
 specACIOnGenGen :: forall a. (Show      a
                              ,Eq        a
                              ,Arbitrary a
                              ,GenValid  a)
                 => (a -> a -> a)
-                ->     a
-                -> Gen (Gen a)
+                -> Gen (GenIN a)
                 -> String
                 -> SpecWith ()
-specACIOnGenGen op e gen description =
+specACIOnGenGen op gen description =
     describe description $ do
       prop "commutativity"             $
         commutativeOnGens op   pairGen    pairShrink
       prop "associativity"                   $
         associativeOnGens op   tripleGen  tripleShrink
-      --prop "neutral elements" $ -- this needs better types
-      --  identityOnGen     op e (join gen) shrink
+      prop "neutral element" $ -- this needs better types
+        identityWithGenIN op gen
+      --prop "null element" $ -- this needs better types
+      --  nullWithGenIN     op gen shrink
   where
     pairShrink :: (a,a) -> [(a,a)]
     pairShrink   (a,b)   = zip  (shrink a) (shrink b)
     tripleShrink (a,b,c) = zip3 (shrink a) (shrink b) (shrink c)
     pairGen              = do
-      aGen <- gen
-      (,)  <$> aGen <*> aGen
+      GenIN {genTest} <- gen
+      (,)  <$> genTest <*> genTest
     tripleGen            = do
-      aGen <- gen
-      (,,) <$> aGen <*> aGen <*> aGen
+      GenIN {genTest} <- gen
+      (,,) <$> genTest <*> genTest <*> genTest
+    specialGen = undefined
+
+nullWithGenIN     op genIn shrink = do
+  GenIN {genTest, genNull} <- genIn
+  aTest <- genTest
+  assert   ((aTest   `op` genNull) == genNull) $
+    return ((genNull `op` aTest  ) == genNull)
+
+identityWithGenIN op genIn = do
+  GenIN {genTest, genUnit} <- genIn
+  aTest <- genTest
+  assert   ((aTest   `op` genUnit) == aTest) $
+    return ((genUnit `op` aTest  ) == aTest)
 
 specAddOnGen :: forall a. (Show      a
                           ,Eq        a
@@ -173,8 +208,8 @@ specAddOnGen :: forall a. (Show      a
                           ,Null      a
                           ,Arbitrary a
                           ,GenValid  a)
-             => Gen (Gen a) -> SpecWith ()
-specAddOnGen gen = specACIOnGenGen (+) nullE gen "addition"
+             => Gen (GenIN a) -> SpecWith ()
+specAddOnGen genIN = specACIOnGenGen (+) genIN "addition"
 
 specMulOnGen :: forall a. (Show      a
                           ,Eq        a
@@ -182,9 +217,9 @@ specMulOnGen :: forall a. (Show      a
                           ,Unit      a
                           ,Arbitrary a
                           ,GenValid  a)
-             => Gen (Gen a)
+             => Gen (GenIN a)
              -> SpecWith ()
-specMulOnGen gen = specACIOnGenGen (*) unitE gen "multiplication"
+specMulOnGen gen = specACIOnGenGen (*) gen "multiplication"
 
 a `sameDim` b = (nrows a == nrows b)
 ```
@@ -196,8 +231,8 @@ spec = do
   shrinkValidSpec @(Matrix Int)
   arbitrarySpec   @(Matrix Int)
   describe "check properties of integers" $ do
-    specAddOnGen  $ pure (arbitrary :: Gen Integer)
-    specMulOnGen  $ pure (arbitrary :: Gen Integer)
+    specAddOnGen  $ pure $ GenIN (arbitrary :: Gen Integer) 1 0
+    specMulOnGen  $ pure $ GenIN (arbitrary :: Gen Integer) 1 0
   {-describe "check properties of matrices of integers" $ do
     specAddOnGen  $ genGenConnMatrix @Integer
     specMulOnGen  $ genGenConnMatrix @Integer-}
