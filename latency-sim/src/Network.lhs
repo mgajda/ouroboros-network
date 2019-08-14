@@ -159,7 +159,8 @@ and `after` in place of multiplication.
 ```
 
 Definition of parametrized matrix multiplication is standard, so
-we can test it over other rings.
+we can test it over other objects with defined multiplication and addition-like
+operators.
 _(We can optimize this definition later, if it turns out to be bottleneck.)_
 ```{.haskell .literate}
 matMult :: (a -> a -> a) -> (a -> a -> a) -> Matrix a -> Matrix a -> Matrix a

@@ -28,6 +28,7 @@ bibliography:
 module SMatrixSpec where
 
 import Control.Monad(liftM2, liftM3)
+import Data.Complex
 import Data.Data
 import Data.GenValidity
 import Data.Proxy
@@ -40,6 +41,7 @@ import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Modifiers
 import Test.Hspec
+import Test.Hspec.QuickCheck
 
 import NullUnit
 import SMatrix
@@ -50,17 +52,6 @@ import SMatrix
 data GenSomeSMatrix a =
   forall n. KnownNat                     n
          => GenSomeSMatrix (Gen (SMatrix n a))
-
-data SomeSMatrix a =
-   forall n. KnownNat             n
-          => SomeSMatrix (SMatrix n a)
-    deriving (Typeable)
-
-instance Eq a => Eq (SomeSMatrix a) where
-  SomeSMatrix a == SomeSMatrix b = False
-
-instance Show a => Show (SomeSMatrix a) where
-  showsPrec _ (SomeSMatrix sm) = ("SMatrix " ++) . shows sm
 
 instance Validity            a
       => Validity (DM.Matrix a) where
@@ -129,7 +120,7 @@ sMatrixOfSize :: Arbitrary a
               => SomeNat -> Gen (SomeSMatrix a)
 sMatrixOfSize aSize = case aSize of
   SomeNat (Proxy :: Proxy n) ->
-    SomeSMatrix <$> (arbitrary :: Gen (SMatrix n _))
+    SomeSMatrix <$> (arbitrary :: Arbitrary a => Gen (SMatrix n a))
 
 test = u == u
   where
@@ -139,10 +130,37 @@ test = u == u
 numMatrix :: Int -> SMatrix 1 Int
 numMatrix a = sMatrix (Proxy :: Proxy 1) $ const a
 
+sumMatrix :: (KnownNat n
+             ,Num        a)
+          =>  SMatrix  n a -> a
+sumMatrix  = sum
+
+(|*|) :: (Num        a
+         ,KnownNat n  )
+      =>  SMatrix  n a
+      ->  SMatrix  n a
+      ->  SMatrix  n a
+(|*|) = sMatMult (+) (*)
+
+complexMatrix :: Num a => Complex a -> SMatrix 2 a
+complexMatrix c = sMatrixFromLists (Proxy :: Proxy 2)
+                                   [[re, im], [-im, re]]
+  where
+    re = realPart c
+    im = imagPart c
+
 spec = do
   describe "Example operations on SMatrices" $ do
     it "SMatrix of size 1 is just a number" $ do
       numMatrix 1 == numMatrix 1
+    prop "Addition of SMatrices of size 1 is just like number addition" $
+      \a b -> sumMatrix (numMatrix a |+| numMatrix b) == a+b
+    prop "Multiplication of SMatrices of size 1 is just like number multiplication" $
+      \a b -> sumMatrix (numMatrix a |*| numMatrix b) == a*b
+    describe "complex numbers as matrices" $ do
+      prop "multiplication" $ \a (b :: Complex Double) ->
+        complexMatrix a |*| complexMatrix b == complexMatrix (a*b)
+
   it "truthy" $ True `shouldBe` True
   --eqSpecOnValid @(SMatrix 4 Int)
   --shrinkValidSpec @(SomeSMatrix Integer)

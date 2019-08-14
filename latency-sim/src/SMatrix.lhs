@@ -66,6 +66,12 @@ instance KnownNat n => Enum (UpTo n) where
 upToLimit :: KnownNat n => UpTo n -> Natural
 upToLimit (_ :: UpTo n)= toEnum $ fromIntegral $ natVal (Proxy @n)
 
+allUpTo'  :: KnownNat n => UpTo n -> [UpTo n]
+allUpTo' n = UpTo <$> [1..upToLimit n]
+
+allUpTo :: KnownNat n => [UpTo n]
+allUpTo = allUpTo' undefined
+
 newtype SMatrix (n::Nat) a = SMatrix { unSMatrix :: DM.Matrix a }
   deriving (Show, Eq, Functor, Applicative
            ,Foldable, Traversable,  Typeable, Generic)
@@ -116,4 +122,63 @@ instance (KnownNat      n
     where
       elt (i,j) | i == j = unitE
       elt (i,j)          = nullE
+```
+Definition of parametrized matrix multiplication is standard, so
+we can test it over other objects with defined multiplication and addition-like
+operators.
+_(We can optimize this definition later, if it turns out to be bottleneck.)_
+```{.haskell .literate}
+sMatMult ::  KnownNat n
+         => (a -> a -> a) -- ^ addition
+         -> (a -> a -> a) -- ^ multiplication
+         ->  SMatrix  n a
+         ->  SMatrix  n a
+         ->  SMatrix  n a
+sMatMult add mul a1 (a2 :: SMatrix n a) = sMatrix (Proxy :: Proxy n) gen
+  where
+    gen ::  KnownNat n
+        => (UpTo n, UpTo n)
+        ->  a
+    gen (i,j) = foldr1 add
+                       [ (a1 ! (i,k)) `mul` (a2 ! (k,j))
+                         | k <- allUpTo' i ]
+```
+Note that to measure convergence of the process, we need a notion of distance
+between two matrices.
+
+Matrix addition for testing:
+```{.haskell .literate}
+(|+|) :: (Num        a
+         ,KnownNat n  )
+      => SMatrix   n a
+      -> SMatrix   n a
+      -> SMatrix   n a
+a |+| b = (+) <$> a <*> b
+```
+
+Constructing from lists:
+```{.haskell .literate}
+sMatrixFromLists :: KnownNat n => Proxy n -> [[a]] -> SMatrix n a
+sMatrixFromLists p ls = sMatrix p genElt
+  where
+    genElt (fromEnum . pred -> i
+           ,fromEnum . pred -> j) = (ls !! i) !! j
+```
+
+For convenient testing in arbitrary dimension,
+we need existentially quantified matrices:
+```{.haskell .literate}
+data SomeSMatrix a =
+   forall n. KnownNat             n
+          => SomeSMatrix (SMatrix n a)
+    deriving (Typeable)
+
+instance Eq a => Eq (SomeSMatrix a) where
+  SomeSMatrix a == SomeSMatrix b = False
+
+instance Show a => Show (SomeSMatrix a) where
+  showsPrec _ (SomeSMatrix sm) = ("SMatrix " ++) . shows sm
+
+someSMatrix :: [a] -> SomeSMatrix a
+someSMatrix  = undefined
 ```
