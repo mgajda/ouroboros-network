@@ -28,6 +28,7 @@ import Series
 import Latency
 import Metric
 import NullUnit
+import KOutOfN
 ```
 
 # Representing networks
@@ -112,12 +113,18 @@ Matrix multiplication follows uses $(\mathbf{;},∨)$ instead of $(*,+)$.
 
 When it exists, limit of the series $R_n(A)=A^n$ is called $A^{*}$.
 
+In case of non-zero delays, outside diagonal, we may also consider convergence
+for delays up to $t$.
+NOTE:
+  _We need to add estimate of convergence for cutoff time $t$ and number of iterations $n$,
+  provided that least delay is in some relation to $n*t$._
+
 Also note that this series converges to $ΔQ$ on
 a single shortest path between each two nodes.
 That means that we may call this matrix $R_{min}(t)$,
 or optimal diffusion matrix.
 ```{.haskell .literate}
--- | This computes optimal connections on $\deltaQ{}$ matrix.
+-- | This computes optimal connections on ΔQ matrix.
 --   TODO: Check that it works both for boolean matrices, and $\deltaQ{}$.
 optimalConnections a = converges 1000 step a
   where

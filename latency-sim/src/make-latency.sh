@@ -22,6 +22,7 @@ echo "Building .lhs to check source code is valid"
 stack build
 
 echo "Checking for missing files in toc.list:"
-for i in *.lhs *.mmd; do grep $i toc.list>/dev/null || echo "Missing file in TOC: $i"; done
+for i in *.lhs *.mmd;   do grep $i toc.list>/dev/null || echo "Missing file in TOC: $i"; done
 for i in ../test/*.lhs; do grep $i toc.list>/dev/null || echo "Missing file in TOC: $i"; done
+for i in ../sim/*.lhs;  do grep $i toc.list>/dev/null || echo "Missing file in TOC: $i"; done
 

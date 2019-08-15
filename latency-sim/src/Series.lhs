@@ -46,7 +46,7 @@ but use use finite series and shortcut evaluation:
 ```{.haskell .literate}
 -- | Series contain the same information as lists.
 newtype Series a = Series { unSeries :: [a] }
-  deriving (Eq, Show, Read)
+  deriving (Eq, Show, Read, Functor, Foldable, Semigroup)
 ```
 Generating function of :
 $$ F(t)=f_0*t^0+f_1*t^1+f_2*t^2+...+f_n*t^n $$
@@ -100,15 +100,6 @@ subrem = Series . scanl (-) 1 . unSeries
 cut :: Delay -> Series a -> Series a
 cut (Delay t) (Series s) = Series (take t s)
 
-instance Functor Series where
-  fmap f (Series a) = Series (fmap f a)
-
-instance Foldable Series where
-  foldr f e (Series s) = foldr f e s
-
-instance Semigroup (Series a) where
-  Series a <> Series b = Series (a <> b)
-
 instance IsList (Series a) where
   type Item (Series a) = a
   fromList          = Series
@@ -122,28 +113,29 @@ _ .* (Series []    ) = Series []
 ```
 $$ F(t)=f_0*t^0+f_1*t^1+f_2*t^2+...+f_n*t^n $$
 Convolution:
-$$F(t)*G(t)=\Sigma_{\tau=0}^t x^t*f(\tau)*g(t-\tau) $$
+$$F(t)⊛G(t)=\Sigma_{\tau=0}^t x^t*f(\tau)*g(t-\tau) $$
 Wikipedia's definition:
-$$(f * g)(t) \triangleq\ \int_{-\infty}^\infty f(\tau) g(t - \tau) \, d\tau.$$
+$$(f ⊛ g)(t) \triangleq\ \int_{-\infty}^\infty f(\tau) g(t - \tau) \, d\tau.$$
 Distribution is from $0$ to $+\infty$:
 Wikipedia's definition:
 
-1. First we fix the boundaries of integration: $$(f * g)(t) \triangleq\ \int_{0}^\infty f(\tau) g(t - \tau) \, d\tau.$$
+1. First we fix the boundaries of integration: $$(f ⊛ g)(t) \triangleq\ \int_{0}^\infty f(\tau) g(t - \tau) \, d\tau.$$
 (Assuming $f(t)=g(t)=0$ when $t<0$.)
 
 2. Now we change to discrete form:
 
-$$(f * g)(t) \triangleq\ \Sigma_{0}^\infty f(\tau) g(t - \tau)$$
+$$(f ⊛ g)(t) \triangleq\ \Sigma_{0}^\infty f(\tau) g(t - \tau)$$
 
 3. Now we notice that we approximate functions up to term $n$:
-$$(f * g)(t) \triangleq\ \Sigma_{0}^{n} f_{\tau} g_{t - \tau}.$$
+$$(f ⊛ g)(t) \triangleq\ \Sigma_{0}^{n} f_{\tau} g_{t - \tau}.$$
 
 Resulting in convolution:
-$$F(t)*G(t)=Σ_{\tau{}=0}^t x^t*f(\tau)*g(t-
+$$F(t)⊛G(t)=Σ_{\tau{}=0}^t x^t*f(\tau)*g(t-
 \tau) $$
 
 
 ```{.haskell .literate}
+infixl 7 `convolve` -- like multiplication
 -- | Convolution in style of McIlroy
 convolve :: Num a => Series a -> Series a -> Series a
 Series (f:fs) `convolve` gg@(Series (g:gs)) =
@@ -160,6 +152,34 @@ Series a .*. Series b = Series (zipWith (*) a b)
 ```
 Since we use finite series, we need to extend their length
 when operation is done on series of different length.
+
+Note that for emphasis, we also allow convolution with arbitrary addition
+and multiplication:
+```{.haskell .literate}
+convolve_ :: (a -> a -> a)
+          -> (a -> a -> a)
+          -> Series a -> Series a -> Series a
+convolve_ (+) (*) (Series (f:fs)) gg@(Series (g:gs)) =
+  Series
+    (f * g :
+      zipWithExpanding (+) (f .* gs)
+                           (unSeries (convolve_ (+) (*) (Series fs) gg)))
+  where
+    a .* bs = (a*) <$> bs
+convolve_ _ _ (Series [])  _          = Series []
+convolve_ _ _  _          (Series []) = Series []
+
+```
+We need a variant of `zipWith` that assumes that shorter list is expanded
+with unit of the operation given as argument:
+```{.haskell .literate
+zipWithExpanding f = go
+  where
+    go    []     ys  = ys -- unit `f` y    == y
+    go    xs     []  = xs -- x    `f` unit == x
+    go (x:xs) (y:ys) = (x `f` y):go xs ys
+
+```
 
 Here we use extension by a given element `e`, which is 0 for normal series,
 or 1 for complement series.
@@ -188,15 +208,15 @@ extendToSameLength' (Series a, Series b) = (Series resultA, Series resultB)
     (resultA, resultB) = go a b
     go  []       []  = (    [] ,    [] )
     go  [b]     [c]  = (   [b] ,   [c] )
-    go (b:bs) (c:cs) = (  b:bs',  c:cs')
-      where
-        ~(bs', cs') = go bs cs
     go (b:bs)   [c]  = (  b:bs,   c:cs')
       where
         ~(bs', cs') = go bs [c]
     go   [b]  (c:cs) = (b  :bs',  c:cs )
       where
         ~(bs', _  ) = go [b] cs
+    go (b:bs) (c:cs) = (  b:bs',  c:cs')
+      where
+        ~(bs', cs') = go bs cs
 ```
 _Note: if we aim for more elegant presentation, we might come back to infinite
 series and instead choose length of approximation when computing them._
@@ -204,11 +224,7 @@ series and instead choose length of approximation when computing them._
 Now we can present an instance of number class for `Series`:
 ```{.haskell .literate}
 instance Num a => Num (Series a) where
-  Series a + Series b = Series (go a b)
-    where
-      go    []     ys  = ys
-      go    xs     []  = xs
-      go (x:xs) (y:ys) = (x+y):go xs ys
+  Series a + Series b = Series (zipWithExpanding (+) a b)
   (*)         = convolve
   abs         = fmap abs
   signum      = fmap signum

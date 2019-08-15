@@ -45,6 +45,7 @@ import Delay
 import Series
 import Metric
 import NullUnit
+import Complement
 
 ```
 # Latency distributions
@@ -104,7 +105,7 @@ cdf = cumsum . pdf
 Since it is common use complement of CDF, we can have accessor for this one too:
 ```{.haskell .literate}
 complementCDF :: LatencyDistribution -> Series Probability
-complementCDF = fmap (1.0-) . cumsum . pdf
+complementCDF = complement . cumsum . pdf
 ```
 
 Since we use `canonicalizeLD` to make sure that every distribution is kept
@@ -122,7 +123,7 @@ fromCDF = canonicalizeLD . LatencyDistribution . diffEnc
 ```
 Similar we can create `LatencyDistribution` from complement of CDF:
 ```{.haskell .literate}
-fromComplementOfCDF = canonicalizeLD . LatencyDistribution . diffEnc . fmap (1.0-)
+fromComplementOfCDF = canonicalizeLD . LatencyDistribution . diffEnc . complement
 ```
 
 For ease of implementation, we express each function as a series of values
@@ -160,7 +161,7 @@ X(ΔQ)(t)≡\begin{cases}ΔQ(t)     & \text{for } t≤d(ΔQ)\\
          \end{cases}
 $$
 
-## Operations on ΔQ
+## Basic operations on ΔQ
 
 To model connections of multiple nodes, and network protocols we need two basic
 operations:

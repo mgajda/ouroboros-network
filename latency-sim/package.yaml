@@ -74,4 +74,28 @@ tests:
     build-tools:
     - hspec-discover
     - markdown-unlit
+  simulation-test:
+    main:                SimulationTest.lhs
+    source-dirs:
+      - test
+      - sim
+    other-modules: LatencySpec ProbabilitySpec SeriesSpec
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - latency-sim
+    - hspec
+    - hspec-expectations
+    - statistics
+    - QuickCheck
+    - validity
+    - genvalidity
+    - genvalidity-hspec
+    - genvalidity-property
+    - matrix
+    build-tools:
+    - hspec-discover
+    - markdown-unlit
 

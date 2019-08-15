@@ -2,7 +2,9 @@ README.mmd
 Latency.lhs
 LatencyEstimates.lhs
 Simulation.lhs
-../test/SimulationSpec.lhs
+../sim/SimulationTest.lhs
+KOutOfN.lhs
+../test/KOutOfNSpec.lhs
 Network.lhs
 closure.mmd
 Delay.lhs
@@ -11,4 +13,9 @@ Probability.lhs
 Series.lhs
 ../test/LatencySpec.lhs
 ../test/NetworkSpec.lhs
+Complement.lhs
+Metric.lhs
+NullUnit.lhs
+SMatrix.lhs
+../test/SMatrixSpec.lhs
 epilogue.mmd

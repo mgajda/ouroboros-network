@@ -64,7 +64,7 @@ instance KnownNat n => Enum (UpTo n) where
   succ (UpTo a :: UpTo n) = UpTo $ succ a
 
 upToLimit :: KnownNat n => UpTo n -> Natural
-upToLimit (_ :: UpTo n)= toEnum $ fromIntegral $ natVal (Proxy @n)
+upToLimit (_ :: UpTo n)= toEnum $ fromIntegral $ natVal (Proxy :: Proxy n)
 
 allUpTo'  :: KnownNat n => UpTo n -> [UpTo n]
 allUpTo' n = UpTo <$> [1..upToLimit n]
@@ -79,7 +79,7 @@ newtype SMatrix (n::Nat) a = SMatrix { unSMatrix :: DM.Matrix a }
 
 ```{.haskell .literate}
 size :: KnownNat n => SMatrix n a -> Int
-size (s :: SMatrix n a)= intVal (Proxy @n)
+size (s :: SMatrix n a)= intVal (Proxy :: Proxy n)
 
 intVal :: KnownNat n => Proxy n -> Int
 intVal = fromIntegral . natVal
@@ -181,4 +181,12 @@ instance Show a => Show (SomeSMatrix a) where
 
 someSMatrix :: [a] -> SomeSMatrix a
 someSMatrix  = undefined
+```
+
+One might also want to iterate over rows or columns in the matrix:
+```{.haskell .literate}
+rows, columns :: KnownNat n
+              => SMatrix n a -> [[a]]
+rows    sm = [[sm ! (i,j) | j<-allUpTo ] | i<-allUpTo]
+columns sm = [[sm ! (i,j) | i<-allUpTo ] | j<-allUpTo]
 ```

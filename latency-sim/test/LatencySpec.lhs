@@ -9,6 +9,7 @@ output:
 bibliography:
   - Latency.bib
 ---
+
 ```{.haskell .hidden}
 {-# LANGUAGE AllowAmbiguousTypes        #-}
 {-# LANGUAGE ExplicitForAll             #-}
