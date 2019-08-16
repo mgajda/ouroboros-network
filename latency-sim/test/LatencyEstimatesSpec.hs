@@ -13,7 +13,7 @@ import Metric
 
 import Test.QuickCheck
 import Test.QuickCheck.All
-import Test.Hspec(Spec, SpecWith, describe, it, shouldBe)
+import Test.Hspec(Spec, SpecWith, describe, it, shouldBe, Expectation)
 import Test.Hspec.QuickCheck
 
 import GHC.Exts(IsList(..))
@@ -68,14 +68,14 @@ spec = do
                property $ \(Positive x) (Positive n) -> earliest (fromList $ replicate n x)
                              `shouldBe` Earliest (Sometime 0)
              skip $ it "earliest of allLost is 0" $ do
-               earliest (allLost @LatencyDistribution) `shouldBe` Earliest (Sometime 0)
+               earliest allLost `shouldBe` Earliest (Sometime 0)
              it "earliest of delay t is t" $ do
                property $ \t -> earliest (delay t) `shouldBe` Earliest (Sometime (t :: Delay))
            describe "TTC ops on latest" $ do
              it "latest of noDelay is 0" $ do
                latest [1] `shouldBe` Latest (Sometime 0)
              it "Latest of allLost is 0" $ do
-               latest (allLost @LatencyDistribution) `shouldBe` Latest Never
+               latest allLost  `shouldBe` Latest Never
              it "latest of [0.0] is never" $ do
                latest [0.0] `shouldBe` Latest Never
              it "latest of delay t is t" $ do
@@ -89,8 +89,19 @@ spec = do
            latestIsFunctorForTTC
          describe "Earliest" $ lawsOfTTC @Earliest
          describe "Latest" $ lawsOfTTC @Latest
+  where
+    earliest :: LatencyDistribution IdealizedProbability -> Earliest
+    earliest  = LatencyEstimates.earliest
+    latest   :: LatencyDistribution IdealizedProbability -> Latest
+    latest    = LatencyEstimates.latest
 
 -- | Verify the functor with respect to TTC operations on `LatencyDistribution`s.
+verifyTTCFunctor ::  TimeToCompletion a
+                 =>  String
+                 -> (LatencyDistribution IdealizedProbability
+                       -> a -> Expectation)
+                 -> (LatencyDistribution IdealizedProbability -> a)
+                 ->  SpecWith ()
 verifyTTCFunctor name compatible extract =
   describe (name ++ " is a functor with respect to ") $ do
      prop "firstToFinish" $ \a b -> (isValidLD a && isValidLD b) ==>
@@ -105,6 +116,10 @@ verifyTTCFunctor name compatible extract =
      prop "delay"         $ \t -> delay t `compatible` delay t
      prop "allLost"       $ allLost  `compatible` allLost
 
-earliestIsFunctorForTTC = verifyTTCFunctor "earliest" (\a b -> earliest a `shouldBe` b) earliest
+earliestIsFunctorForTTC = verifyTTCFunctor "earliest"
+                                          (\a b -> earliest a `shouldBe` b)
+                                            earliest
 
-latestIsFunctorForTTC   = verifyTTCFunctor "latest"   (\a b -> latest   a `shouldBe` b) latest
+latestIsFunctorForTTC   = verifyTTCFunctor "latest"
+                                          (\a b -> latest   a `shouldBe` b)
+                                            latest

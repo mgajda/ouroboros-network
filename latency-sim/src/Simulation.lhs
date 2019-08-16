@@ -21,6 +21,7 @@ import qualified Statistics.Distribution             as Statistics
 import qualified System.Random.MWC as MWC(Gen, GenST, withSystemRandom, asGenST)
 
 import           Latency
+import           Probability
 ```
 
 ## Verifying operations on distributions
@@ -77,18 +78,23 @@ or addition of times for sequential composition.
 
 We need to sample `Simulation` a number of times to get a histogram.
 ```{.haskell .literate}
-sampleSimulation' :: Int -> Simulation -> IO LatencyDistribution
+sampleSimulation' :: Probability a
+                  => Int -> Simulation -> IO (LatencyDistribution a)
 sampleSimulation' numSamples (Simulation s) = histogram <$>
     (MWC.withSystemRandom . MWC.asGenST $ sampler)
   where
     sampler :: forall s. MWC.GenST s -> ST s [Delay]
     sampler st = replicateM numSamples $ s st
 
-sampleSimulation = sampleSimulation' 10000
+sampleSimulation :: Simulation
+                 -> IO (LatencyDistribution ApproximateProbability)
+sampleSimulation  = sampleSimulation' 10000
 ```
 To build the histogram, we sort and count delays from the list of samples:
 ```{.haskell .literate}
-histogram :: [Delay] -> LatencyDistribution
+histogram :: Probability         a
+          => [Delay]
+          -> LatencyDistribution a
 histogram = fromList . scale . go (0, 0) . sort
   where
     scale l = fmap (/sum l) l

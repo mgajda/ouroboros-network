@@ -29,11 +29,17 @@ bibliography:
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE UnicodeSyntax     #-}
 {-# LANGUAGE ViewPatterns      #-}
-module Probability(Probability(..)
-                  ,isValidProbability) where
+module Probability(IdealizedProbability(..)
+                  ,isValidIdealizedProbability
+                  ,ApproximateProbability(..)
+                  ,isValidApproximateProbability
+                  ,Probability(..)
+                  ,Complement(..)
+                  ) where
 
 import Data.Ratio((%), Ratio)
 
+import Metric
 ```
 
 # Appendix: Probability data type
@@ -42,10 +48,60 @@ import Data.Ratio((%), Ratio)
 is defined here for reference:
 ```{.haskell .literate}
 -- | Between 0.0 and 1.0
-newtype Probability = Prob { unProb :: Ratio Integer }
+newtype IdealizedProbability = IProb { unIProb :: Ratio Integer }
   deriving (Num, Fractional, Real, Ord, Eq,
-            Read, Show)
+            Read, Enum)
 
-isValidProbability :: Probability -> Bool
-isValidProbability p = p>= 0 && p<=1.0
+class (Complement a
+      ,Fractional a
+      ,Num        a
+      ,Eq         a
+      ,Ord        a
+      ,Show       a
+      ,Enum       a
+      ) => Probability a where
+  isValidProbability :: a -> Bool
+
+instance Show IdealizedProbability where
+  showsPrec p (IProb x) = showsPrec p $ realToFrac x
+
+isValidIdealizedProbability :: IdealizedProbability -> Bool
+isValidIdealizedProbability p = p>= 0 && p<=1.0
+
+newtype ApproximateProbability = AProb { unAProb :: Double }
+  deriving (Num, Fractional, Real, Ord, Eq,
+            Read, Enum)
+
+instance Show ApproximateProbability where
+  showsPrec p (AProb x) = showsPrec p x
+
+instance Metric ApproximateProbability where
+  AProb a `distance` AProb b = abs (a-b)
+  similarityThreshold = 0.001
+
+instance Probability IdealizedProbability where
+  isValidProbability = isValidIdealizedProbability
+
+instance Probability ApproximateProbability where
+  isValidProbability = isValidApproximateProbability
+
+isValidApproximateProbability p = p>=0 && p<=1.0+epsilon
+  where
+    epsilon = 1e-12
 ```
+
+For probability, there is a well established definition of a `complement`:
+```{.haskell .literate}
+instance Complement IdealizedProbability where
+  complement p = 1-p
+
+instance Complement ApproximateProbability where
+  complement p = 1-p
+```
+### Definition of complement
+In different contexts we use a different definition of the complement.
+```{.haskell .literate}
+class Complement a where
+  complement :: a -> a
+```
+Here we put the definitions.

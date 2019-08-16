@@ -27,12 +27,12 @@ module KOutOfN where
 
 import GHC.TypeLits(KnownNat)
 import Data.Function(on)
-import SMatrix
+import Data.Ratio
 
-import Complement
 import Latency
-import Series
 import Probability
+import Series
+import SMatrix
 ```
 # Histogramming
 
@@ -53,17 +53,22 @@ class ExclusiveSum a where
 exSum :: ExclusiveSum a => [a] -> a
 exSum  = foldr1 exAdd
 
-instance ExclusiveSum         Probability  where
+instance ExclusiveSum ApproximateProbability where
+  exAdd = (+)
+
+instance ExclusiveSum IdealizedProbability where
   exAdd = (+)
 
 -- NOTE: Here we assume expansion by unit of exclusive sum:
-instance ExclusiveSum a => ExclusiveSum (Series a) where
+instance ExclusiveSum a
+      => ExclusiveSum (Series a) where
   Series a `exAdd` Series b = Series
                             $ zipWithExpanding exAdd a b
 
-instance ExclusiveSum LatencyDistribution where
+instance ExclusiveSum                      a
+      => ExclusiveSum (LatencyDistribution a) where
   LatencyDistribution a `exAdd` LatencyDistribution b =
-    LatencyDistribution (a + b)
+    LatencyDistribution (exAdd <$> a <*> b)
 ```
 
 ## *K-out-of-N synchronization* of series of events $a_k$.
@@ -110,12 +115,16 @@ vector into a distribution of latencies for reaching _k-out-of-n_ nodes.
 Note that this new series will have _indices_ corresponding to
 *number of nodes reached* instead of node indices:
 ```{.haskell .literate}
-nodesReached :: Series LatencyDistribution -> Series LatencyDistribution
+nodesReached :: (Probability  a
+                ,ExclusiveSum a)
+             => Series (LatencyDistribution a)
+             -> Series (LatencyDistribution a)
 nodesReached  = kOutOfN
 ```
 For this we need to define `complement` for `LatencyDistribution`:
 ```{.haskell .literate}
-instance Complement LatencyDistribution where
+instance Complement a
+      => Complement (LatencyDistribution a) where
   complement (LatencyDistribution s) = LatencyDistribution
                                      ( complement <$> s )
 ```
@@ -130,18 +139,25 @@ We can perform this averaging with exclusive sum operator, pointwise division of
 elements by the number of distributions summed:
 
 ```{.haskell .literate}
-averageKOutOfN  :: KnownNat n
-                => SMatrix n LatencyDistribution
-                -> Series LatencyDistribution
+averageKOutOfN  :: (KnownNat     n
+                   ,Probability  a
+                   ,ExclusiveSum a)
+                => SMatrix n (LatencyDistribution a)
+                -> Series    (LatencyDistribution a)
 averageKOutOfN m = average (nodesReached . Series <$> rows m)
   where
-    average :: [Series LatencyDistribution] -> Series LatencyDistribution
+    average :: (ExclusiveSum                a
+               ,Probability                 a)
+            => [Series (LatencyDistribution a)]
+            ->  Series (LatencyDistribution a)
     average aList =  scaleLD
                  <$> exSum aList
       where
-        len :: Probability
-        len = Prob $ 1/fromIntegral (length aList)
-        scaleLD :: LatencyDistribution -> LatencyDistribution
+        len :: Probability a => a
+        len = 1/(toEnum $ length aList)
+        scaleLD :: Probability         a
+                => LatencyDistribution a
+                -> LatencyDistribution a
         scaleLD (LatencyDistribution s) = LatencyDistribution
                                          ((*len) <$> s)
 ```
@@ -149,18 +165,19 @@ NOTE:
   _We need to use weighted averaging, if we bias source node selection._
 
 ```{.haskell .hidden}
-saveSurface :: FilePath -> Series LatencyDistribution -> IO ()
+saveSurface :: Show a
+            => FilePath -> Series (LatencyDistribution a) -> IO ()
 saveSurface fp curves = writeFile fp
                       $ withLines content ""
   where
     content :: [ShowS]
-    content = zipWith (showCurve showProb) [0..] (unpack <$> unSeries curves)
-    unpack :: LatencyDistribution -> [Probability]
+    content = zipWith showCurve [0..] (unpack <$> unSeries curves)
+    unpack :: LatencyDistribution a -> [a]
     unpack (LatencyDistribution (Series ls)) = ls
 
-showCurve :: (a -> ShowS) -> Int -> [a] -> ShowS
-showCurve f i = withLines
-              . zipWith (showPoint f i) [0..]
+showCurve :: Show a => Int -> [a] -> ShowS
+showCurve i = withLines
+            . zipWith (showPoint i) [0..]
 
 withLines :: [ShowS] -> ShowS
 withLines  = foldr1 joins
@@ -168,13 +185,10 @@ withLines  = foldr1 joins
 joins :: ShowS -> ShowS -> ShowS
 joins a b  = a . ('\n':) . b
 
-showProb :: Probability -> ShowS
-showProb (Prob x) = (shows :: Double -> ShowS) (realToFrac x)
-
-showPoint :: (a -> ShowS) -> Int -> Int -> a -> ShowS
-showPoint f i j v = shows i
-                  . (' ':)
-                  . shows j
-                  . (' ':)
-                  . f v
+showPoint :: Show a => Int -> Int -> a -> ShowS
+showPoint i j v = shows i
+                . (' ':)
+                . shows j
+                . (' ':)
+                . shows v
 ```

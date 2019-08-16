@@ -33,6 +33,7 @@ import Data.Semigroup
 import Delay
 import NullUnit
 import Metric
+import Probability(Complement(..))
 
 import Test.QuickCheck
 import Test.QuickCheck.All
@@ -46,7 +47,7 @@ but use use finite series and shortcut evaluation:
 ```{.haskell .literate}
 -- | Series contain the same information as lists.
 newtype Series a = Series { unSeries :: [a] }
-  deriving (Eq, Show, Read, Functor, Foldable, Semigroup)
+  deriving (Eq, Show, Read, Functor, Foldable, Applicative, Semigroup)
 ```
 Generating function of :
 $$ F(t)=f_0*t^0+f_1*t^1+f_2*t^2+...+f_n*t^n $$
@@ -173,6 +174,7 @@ convolve_ _ _  _          (Series []) = Series []
 We need a variant of `zipWith` that assumes that shorter list is expanded
 with unit of the operation given as argument:
 ```{.haskell .literate
+zipWithExpanding :: (a -> a -> a) -> [a] -> [a] -> [a]
 zipWithExpanding f = go
   where
     go    []     ys  = ys -- unit `f` y    == y
@@ -267,4 +269,12 @@ in the unit tests (10k by default).
 
 ```{.haskell .literate .hidden}
 spec = quickCheckAll
+```
+
+For a `Series` of of objects having complement, there is also well established
+definition:
+```{.haskell .literate}
+instance Complement   a
+      =>  Complement (Series a) where
+  complement = fmap complement
 ```

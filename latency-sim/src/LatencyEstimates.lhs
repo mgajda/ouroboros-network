@@ -68,7 +68,7 @@ instance Ord SometimeOrNever where
   Sometime _ `compare` Never      = LT
   Sometime t `compare` Sometime u = t `compare` u
 
-latest :: LatencyDistribution -> Latest
+latest :: Probability a => LatencyDistribution a -> Latest
 latest ((<1.0) . sum . pdf -> True  ) = Latest Never
 latest (last . unSeries . pdf -> 0.0) =
   error "Canonical LatencyDistribution should always end with non-zero value"
@@ -89,7 +89,7 @@ instance TimeToCompletion Latest where
 ```{.haskell .literate}
 newtype Earliest = Earliest { unEarliest :: SometimeOrNever }
   deriving (Eq, Ord, Show)
-earliest :: LatencyDistribution -> Earliest
+earliest :: Probability a => LatencyDistribution a -> Earliest
 earliest [0.0]  = Earliest Never
 earliest [_]    = Earliest $ Sometime 0
 earliest (last . unSeries . pdf -> 0.0) =

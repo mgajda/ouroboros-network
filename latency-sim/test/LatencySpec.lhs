@@ -58,7 +58,7 @@ and is devoid of superfluous trailing zeros beyond first index.
 Indexing starts at 0 (which means: no delay.)
 ```{.haskell .literate}
 -- | Validity criteria for latency distributions
-isValidLD :: LatencyDistribution -> Bool
+isValidLD :: Probability a => LatencyDistribution a -> Bool
 isValidLD [ ] = False
 ```
 Any distribution with a single-element domain is valid (even if the value is 0.0)
@@ -80,7 +80,9 @@ isValidLD (pdf -> probs) = all isValidProbability probs
 
 We use QuickCheck [@quickcheck] to generate random distribution for testing:
 ```{.haskell .literate}
-instance Arbitrary LatencyDistribution where
+instance (Arbitrary                      a
+         ,Probability                    a)
+      =>  Arbitrary (LatencyDistribution a) where
   arbitrary = sized $ \maxLen -> do
     actualLen <- choose (0, maxLen-1)
     ld <- canonicalizeLD . LatencyDistribution . Series <$>
@@ -98,18 +100,18 @@ instance Arbitrary LatencyDistribution where
            Series              <$>
            recursivelyShrink       ls)
 
-deriving instance Validity     LatencyDistribution
-deriving instance GenValid     LatencyDistribution
-deriving instance GenUnchecked LatencyDistribution
-deriving instance Typeable     LatencyDistribution
+deriving instance Validity     a => Validity     (LatencyDistribution a)
+deriving instance GenValid     a => GenValid     (LatencyDistribution a)
+deriving instance GenUnchecked a => GenUnchecked (LatencyDistribution a)
+deriving instance Typeable     a => Typeable     (LatencyDistribution a)
 ```
 Equality uses lexicographic comparison, since that allows shortcut evaluation
 by the length of shorter distribution:
 ```{.haskell .literate}
-instance Eq LatencyDistribution where
+instance Probability a => Eq (LatencyDistribution a) where
   bs == cs = (lexCompare `on` (unSeries . pdf)) bs cs == EQ
 
-lexCompare :: [Probability] -> [Probability] -> Ordering
+lexCompare :: Probability a => [a] -> [a] -> Ordering
 lexCompare  xs     []    = if all (==0.0) xs
                            then EQ
                            else LT
@@ -175,57 +177,62 @@ lawsOfTTC = do
 ```{.haskell .literate}
 spec = do
   describe "Arbitrary instance for LatencyDistributions" $ do
-    prop "generates result that passes validLD" $ \x -> isValidLD x `shouldBe` True
-    it "[0.0, 0.0] is not valid" $ isValidLD [0.0, 0.0] `shouldBe` False
-    it "[1.0] is valid"          $ isValidLD [     1.0] `shouldBe` True
-    it "[0.0,1.0] is valid"      $ isValidLD [0.0, 1.0] `shouldBe` True
-    it "[1.0,0.0] is not valid"  $ isValidLD [1.0, 0.0] `shouldBe` False
-    it "isValidLD [0.1, 0.3, 0.2, 0.4]" $ [0.1, 0.3, 0.2, 0.4] `shouldSatisfy` isValidLD
+    prop "generates result that passes validLD" $
+      \x -> isValidLD (x :: LatencyDistribution IdealizedProbability) `shouldBe` True
+    it "[0.0, 0.0] is not valid" $ isValidLD [0.0, 0.0::ApproximateProbability] `shouldBe` False
+    it "[1.0] is valid"          $ isValidLD [     1.0::ApproximateProbability] `shouldBe` True
+    it "[0.0,1.0] is valid"      $ isValidLD [0.0, 1.0::ApproximateProbability] `shouldBe` True
+    it "[1.0,0.0] is not valid"  $ isValidLD [1.0, 0.0::ApproximateProbability] `shouldBe` False
+    it "isValidLD [0.1, 0.3, 0.2, 0.4]" $ [0.1, 0.3, 0.2, 0.4::ApproximateProbability]
+         `shouldSatisfy` isValidLD
     it "canonicalizeLD [0.1, 0.3, 0.2, 0.4]" $
-       canonicalizeLD [0.1, 0.3, 0.2, 0.4] `shouldSatisfy` isValidLD
+       canonicalizeLD [0.1, 0.3, 0.2, 0.4::ApproximateProbability]
+         `shouldSatisfy` isValidLD
     prop "canonicalizeLD always produces a valid LatencyDistribution" $
-      \s  -> isValidLD (canonicalizeLD (LatencyDistribution (Series s)))
+      \s  -> isValidLD (canonicalizeLD (LatencyDistribution
+                        (Series (s :: [IdealizedProbability]))))
     prop "shrink always produces a valid LatencyDistribution"         $
-      \ld -> isValidLD ld ==> all isValidLD (shrink ld)
+      \ld -> isValidLD (ld :: LatencyDistribution IdealizedProbability)
+         ==> all isValidLD (shrink ld)
   describe "basic operations on LatencyDistribution" $ do
     prop "multiplication of to undelayed singletons is preserved by `after`" $
       \          a            b  -> [a] `after`                [b]
-                 `shouldBeSimilar` ([a*b] :: LatencyDistribution)
+                 `shouldBeSimilar` ([a*b] :: LatencyDistribution ApproximateProbability)
     prop "afterLD of different length distributions is correct"              $
       \(Positive a) (Positive b) -> [a] `after`           [0.0, b]
-                 `shouldBeSimilar` ([0.0, a*b] :: LatencyDistribution)
+                 `shouldBeSimilar` ([0.0, a*b] :: LatencyDistribution ApproximateProbability)
     it   "firstToFinish of different length distributions is correct"        $                               [1.0] `firstToFinish` [0.0, 1.0]
-                 `shouldBeSimilar` ([1.0] :: LatencyDistribution)
+                 `shouldBeSimilar` ([1.0] :: LatencyDistribution ApproximateProbability)
     it   "lastToFinish of different length distributions is correct"         $                               [1.0] `lastToFinish`  [0.0, 1.0]
-                 `shouldBeSimilar` ([0.0, 1.0] :: LatencyDistribution)
-    it "noDelay is the same as delay 0" $ (noDelay :: LatencyDistribution) == delay 0
+                 `shouldBeSimilar` ([0.0, 1.0] :: LatencyDistribution ApproximateProbability)
+    it "noDelay is the same as delay 0" $ (noDelay :: LatencyDistribution IdealizedProbability) == delay 0
   describe "basic laws of convolution" $ do
     prop "commutative"        $ \l m   ->  l `after` m
-                                       ~~ m `after` (l :: LatencyDistribution)
-    prop "associative"        $ \l m n -> (l `after` m) `after` (n :: LatencyDistribution)
-                                       ~~  l `after` (m `after` n)
+                                       == m `after` (l :: LatencyDistribution IdealizedProbability)
+    prop "associative"        $ \l m n -> (l `after` m) `after` (n :: LatencyDistribution IdealizedProbability)
+                                       ==  l `after` (m `after` n)
     prop "delay 0 is neutral" $ \l     ->  l `after` delay 0
-                                       ~~ (l :: LatencyDistribution)
+                                       == (l :: LatencyDistribution IdealizedProbability)
   describe "basic laws of firstToFinish" $ do
      prop "commutative"        $ \l m   -> l `firstToFinish` m
-                                        ~~ m `firstToFinish` (l :: LatencyDistribution)
+                                        == m `firstToFinish` (l :: LatencyDistribution IdealizedProbability)
      prop "associative"        $ \l m n ->
-           (l `firstToFinish` m) `firstToFinish` (n :: LatencyDistribution)
-        ~~  l `firstToFinish` (m `firstToFinish` n)
+           (l `firstToFinish` m) `firstToFinish` (n :: LatencyDistribution IdealizedProbability)
+        ==  l `firstToFinish` (m `firstToFinish` n)
      prop "delay 0 is neutral" $ \l     ->  l `firstToFinish` allLost
-                                        ~~ (l :: LatencyDistribution)
+                                        == (l :: LatencyDistribution IdealizedProbability)
   describe "basic laws of firstToFinish" $ do
      prop "commutative"        $ \l m   -> l `lastToFinish` m
-                                        ~~ m `lastToFinish` (l :: LatencyDistribution)
-     prop "associative"        $ \l m n -> (l `lastToFinish` m) `lastToFinish` (n :: LatencyDistribution)
-                                        ~~  l `lastToFinish` (m `lastToFinish` n)
+                                        == m `lastToFinish` (l :: LatencyDistribution IdealizedProbability)
+     prop "associative"        $ \l m n -> (l `lastToFinish` m) `lastToFinish` (n :: LatencyDistribution IdealizedProbability)
+                                        ==  l `lastToFinish` (m `lastToFinish` n)
      prop "delay 0 is neutral" $ \l     ->  l `lastToFinish` delay 0
-                                        ~~ (l :: LatencyDistribution)
+                                        == (l :: LatencyDistribution IdealizedProbability)
   eqSpecOnValid   @(Series Int)
   showReadSpec    @(Series Int)
   shrinkValidSpec @(Series Int)
   arbitrarySpec   @(Series Int)
 
-  lawsOfTTC       @LatencyDistribution
+  lawsOfTTC       @(LatencyDistribution ApproximateProbability)
 
 ```
