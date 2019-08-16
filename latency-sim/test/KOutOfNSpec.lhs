@@ -100,12 +100,22 @@ spec = do
   describe "k-out-of-n" $ do
     prop "bernoulli" bernoulliProperty
     it "tests saving a surface" $ do
-      connMatrix :: SMatrix 6 (LatencyDistribution ApproximateProbability)
+      connMatrix :: SMatrix 7 (LatencyDistribution ApproximateProbability)
                  <- generate
                   $ resize testSize arbitrary
-      saveSurface "input_surface.txt" $ averageKOutOfN connMatrix
+      let avg = averageKOutOfN connMatrix
+      putStrLn $ showDim avg ""
+      saveSurface "input_surface.txt" avg
       let iterated = iterate' (|*|connMatrix) connMatrix !! testSize
       saveSurface "after10.txt" $ averageKOutOfN iterated
+
+showDim :: Show a
+        => Series (LatencyDistribution a)
+        -> ShowS
+showDim  = withLines . map ldSize . unSeries
+  where
+    ldSize :: Show a => LatencyDistribution a -> ShowS
+    ldSize (LatencyDistribution (Series s)) = shows $ length s
 
 testSize = 5
 ```
