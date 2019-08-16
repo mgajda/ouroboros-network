@@ -1,6 +1,10 @@
 :set -XOverloadedLists
 :set -XScopedTypeVariables
 :set -XFlexibleContexts
+:set -XDataKinds
+:set -package latency-sim
+import Data.Proxy
+import GHC.TypeLits
 import Latency
 import LatencyEstimates
 import Series

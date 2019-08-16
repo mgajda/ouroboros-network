@@ -33,6 +33,8 @@ import Latency
 import Probability
 import Series
 import SMatrix
+
+import Debug.Trace(trace)
 ```
 # Histogramming
 
@@ -68,7 +70,7 @@ instance ExclusiveSum a
 instance ExclusiveSum                      a
       => ExclusiveSum (LatencyDistribution a) where
   LatencyDistribution a `exAdd` LatencyDistribution b =
-    LatencyDistribution (exAdd <$> a <*> b)
+    LatencyDistribution $ exAdd a b
 ```
 
 ## *K-out-of-N synchronization* of series of events $a_k$.
@@ -141,25 +143,27 @@ elements by the number of distributions summed:
 ```{.haskell .literate}
 averageKOutOfN  :: (KnownNat     n
                    ,Probability  a
-                   ,ExclusiveSum a)
+                   ,ExclusiveSum a
+                   ,Show         a)
                 => SMatrix n (LatencyDistribution a)
                 -> Series    (LatencyDistribution a)
 averageKOutOfN m = average (nodesReached . Series <$> rows m)
+
+average :: (ExclusiveSum                a
+           ,Probability                 a
+           ,Show                        a)
+        => [Series (LatencyDistribution a)]
+        ->  Series (LatencyDistribution a)
+average aList =  scaleLD
+             <$> trace ("Scale: " <> show (1/fromIntegral (length aList))
+                      <>" len "   <> show (length aList)) (exSum aList)
   where
-    average :: (ExclusiveSum                a
-               ,Probability                 a)
-            => [Series (LatencyDistribution a)]
-            ->  Series (LatencyDistribution a)
-    average aList =  scaleLD
-                 <$> exSum aList
-      where
-        len :: Probability a => a
-        len = 1/(toEnum $ length aList)
-        scaleLD :: Probability         a
-                => LatencyDistribution a
-                -> LatencyDistribution a
-        scaleLD (LatencyDistribution s) = LatencyDistribution
-                                         ((*len) <$> s)
+    --scale   :: (Probability a, Show a) => a
+    -- scale    =
+    scaleLD :: Probability         a
+            => LatencyDistribution a
+            -> LatencyDistribution a
+    scaleLD ld = scaleProbability (1/fromIntegral (length aList)) ld
 ```
 NOTE:
   _We need to use weighted averaging, if we bias source node selection._

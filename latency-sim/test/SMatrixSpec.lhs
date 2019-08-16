@@ -25,6 +25,7 @@ bibliography:
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE UnicodeSyntax              #-}
 module SMatrixSpec where
 
 import Control.Monad(liftM2, liftM3)
@@ -40,11 +41,15 @@ import qualified Data.Matrix as DM
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Modifiers
-import Test.Hspec
+import Test.Hspec hiding (after)
 import Test.Hspec.QuickCheck
 
+import Latency
 import NullUnit
+import Probability
 import SMatrix
+
+import LatencySpec
 ```
 
 
@@ -112,10 +117,6 @@ data Together3 a b c =
   Together3 a b c
   deriving (Eq, Ord, Show)
 
-smatrixGen = do
-  Positive n <- arbitrary
-  return $ someNatVal n
-
 sMatrixOfSize :: Arbitrary a
               => SomeNat -> Gen (SomeSMatrix a)
 sMatrixOfSize aSize = case aSize of
@@ -160,9 +161,7 @@ spec = do
     describe "complex numbers as matrices" $ do
       prop "multiplication" $ \a (b :: Complex Double) ->
         complexMatrix a |*| complexMatrix b == complexMatrix (a*b)
-
-  it "truthy" $ True `shouldBe` True
-  --eqSpecOnValid @(SMatrix 4 Int)
+  --eqSpecOnValid   @(SomeSMatrix Integer)
   --shrinkValidSpec @(SomeSMatrix Integer)
   --arbitrarySpec   @(SomeSMatrix Integer)
   {-describe "check properties of integers" $ do

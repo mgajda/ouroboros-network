@@ -127,7 +127,6 @@ invertComparison EQ = EQ
 ```{.haskell .literate .hidden}
 -- | Hspec expectation for showing instance when they are too dissimilar.
 shouldBeSimilar :: (HasCallStack
-                   ,TimeToCompletion ttc
                    ,Metric           ttc
                    ,Show             ttc
                    ) => ttc -> ttc -> Expectation

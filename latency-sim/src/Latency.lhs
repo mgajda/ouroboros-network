@@ -31,6 +31,8 @@ module Latency(
   , preserved
   , canonicalizeLD
   , (~~)
+  , scaleProbability
+  , scaleDelay
   ) where
 
 import GHC.Exts(IsList(..))
@@ -479,3 +481,13 @@ instance (Metric     a
 ```
 
 Choosing `0.001` as similarity threshold (should depend on number of samples)
+
+```{.haskell .literate}
+instance Unit a
+      => Unit (LatencyDistribution a) where
+  unitE = LatencyDistribution (Series [unitE])
+
+instance Null a
+      => Null (LatencyDistribution a) where
+  nullE = LatencyDistribution (Series [nullE])
+```

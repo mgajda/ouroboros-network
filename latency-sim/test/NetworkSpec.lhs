@@ -16,6 +16,7 @@ bibliography:
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE NamedFieldPuns             #-}
+{-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
@@ -24,18 +25,22 @@ module NetworkSpec where
 
 import Latency
 import Network
-import Series
 import NullUnit
+import Probability
+import Series
+import SMatrix
+import LatencySpec
 
 import Control.Monad
 import Control.Exception(assert)
-import Data.Matrix
+-- import Data.Matrix
+import Data.Proxy
 import Data.Ratio
 import Data.Validity
 import Data.Foldable(fold)
 import GHC.TypeNats
 
-import Test.Hspec
+import Test.Hspec hiding(after)
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
 import Test.QuickCheck.Arbitrary
@@ -54,7 +59,7 @@ in connection matrices. They have the following properties:
 * they are always square matrices
 * they always have unit distribution (`noDelay`) on the diagonal
 
-```{.haskell .literate}
+```{.haskell .literate .ignore}
 instance (Unit            a
          ,Eq              a
          ,Validity        a)
@@ -84,7 +89,7 @@ instance (Unit              a
       m = ncols a
 ```
 To generate connection matrix of size $n$:
-```{.haskell .literate}
+```{.haskell .literate .ignore}
 genConnMatrix :: (Arbitrary  a
                  ,Unit       a)
               => Int
@@ -96,10 +101,10 @@ genConnMatrix n = do
 ```
 When we are interested in generating multiple matrices of the same size,
 we can generate a generate for a random size:
-```{.haskell .literate}
-genGenConnMatrix :: (Unit             a
-                    ,Null             a
-                    ,Arbitrary        a)
+```{.haskell .literate .ignore}
+genGenConnMatrix :: (Unit               a
+                    ,Null               a
+                    ,Arbitrary          a)
                  =>  Gen (GenIN (Matrix a))
 genGenConnMatrix  = do
   n <- choose (1,20)
@@ -124,17 +129,14 @@ unitElt _            = nullE
 ```
 
 Generation of element in connection matrix depends on index:
-```{.haskell .literate}
+```{.haskell .literate .ignore}
 genConnElt i j | i == j = return unitE
 genConnElt _ _          = arbitrary
 
-elements a = map (a!) $ indices a
+-- elements a = map (a!) $ indices a
 
-indices a = [(i,k) | i<-[1..n]
-                   , k<-[1..m]]
-  where
-    n = nrows a
-    m = ncols a
+indices a = [(i,k) | i<-allUpTo
+                   , k<-allUpTo
 
 instance CoArbitrary         a
       => CoArbitrary (Matrix a) where
@@ -156,7 +158,7 @@ instance (Unit             a
 ```
 
 Here we have properties typical of traditional instances of `Num`:
-```{.haskell .literate}
+```{.haskell .literate .ignore}
 identityWithGen :: Gen (Gen a, a) -> Property
 identityWithGen = undefined
 
@@ -222,7 +224,7 @@ specAddOnGen genIN = specACIOnGenGen (+) genIN "addition"
 
 ```
 Or should I use `forAllShrink :: (Show a, Testable prop) => Gen a -> (a -> [a]) -> (a -> prop) -> Property`?
-```{.haskell .literate}
+```{.haskell .literate .ignore}
 specMulOnGen :: forall a. (Show      a
                           ,Eq        a
                           ,Num       a
@@ -238,15 +240,135 @@ a `sameDim` b = (nrows a == nrows b)
 Test that type class instances are valid:
 ```{.haskell .literate}
 spec = do
-  eqSpecOnValid   @(Matrix Int)
-  shrinkValidSpec @(Matrix Int)
-  arbitrarySpec   @(Matrix Int)
-  describe "check properties of integers" $ do
+  {-describe "check properties of integers" $ do
     specAddOnGen  $ pure $ GenIN (arbitrary :: Gen Integer) 0 0
     specMulOnGen  $ pure $ GenIN (arbitrary :: Gen Integer) 1 0
   describe "check properties of matrices of integers" $ do
     specAddOnGen  $ swapGenConnMatrix $ genGenConnMatrix @Integer
-    specMulOnGen  $ genGenConnMatrix @Integer
+    specMulOnGen  $ genGenConnMatrix @Integer-}
+  describe "Examples discussed" $ do
+    describe "Example 0" $ do
+      it "Second iteration" $
+        ex0_1 *** ex0_1                     `shouldBeSimilar` ex0_2
+      it "Third iteration" $
+        ex0_1 *** ex0_1 *** ex0_1           `shouldBeSimilar` ex0_3
+    describe "Example 2 with four nodes" $ do
+      it "Second iteration" $
+        ex2_1 *** ex2_1                       `shouldBeSimilar` ex2_2
+      it "Third iteration" $
+        ex2_1 *** ex2_1 *** ex2_1             `shouldBeSimilar` ex2_3
+      it "Fourth iteration" $
+        ex2_1 *** ex2_1 *** ex2_1 *** ex2_1   `shouldBeSimilar` ex2_4
+    describe "Example 2" $ do
+      it "First iteration" $
+        ex2_1 *** ex2_1                       `shouldBeSimilar` ex2_2
+      it "Second iteration" $
+        ex2_1 *** ex2_1 *** ex2_1             `shouldBeSimilar` ex2_3
+      it "Third iteration" $
+        ex2_1 *** ex2_1 *** ex2_1 *** ex2_1   `shouldBeSimilar` ex2_4
+    describe "Example 2 with four nodes" $ do
+      it "First iteration" $
+        ex2_1 *** ex2_1                       `shouldBeSimilar` ex2_2
+      it "Second iteration" $
+        ex2_1 *** ex2_1 *** ex2_1             `shouldBeSimilar` ex2_3
+      it "Third iteration" $
+        (ex2_1 *** ex2_1 *** ex2_1 *** ex2_1) `shouldBeSimilar` ex2_4
+
+```
+
+We also specialize the types for testing
+```{.haskell .literate}
+(/*>) :: KnownNat n
+      => SMatrix  n (LatencyDistribution ApproximateProbability)
+      -> SMatrix  n (LatencyDistribution ApproximateProbability)
+      -> SMatrix  n (LatencyDistribution ApproximateProbability)
+(/*>)  = sMatMult firstToFinish after
+(***) :: KnownNat n
+      => SMatrix  n (LatencyDistribution IdealizedProbability)
+      -> SMatrix  n (LatencyDistribution IdealizedProbability)
+      -> SMatrix  n (LatencyDistribution IdealizedProbability)
+(***)  = sMatMult firstToFinish after
+
+```
+
+Here are the examples discussed along with distributivity:
+```{.haskell .literate}
+infixr 7 ♢
+infixr 5 ∨
+
+(♢), (∨), (∧) :: TimeToCompletion ttc
+               => ttc -> ttc -> ttc
+(♢) = after
+(∨) = firstToFinish
+(∧) = lastToFinish
+
+ex0_1, ex0_2, ex0_3 :: SMatrix 3 (LatencyDistribution IdealizedProbability)
+ex0_1 =
+      sMatrixFromLists (Proxy :: Proxy 3)
+               [[_0, d,_0]
+               ,[_0,_0, d]
+               ,[_0,_0,_0]
+               ]
+ex0_2 = sMatrixFromLists (Proxy :: Proxy 3)
+               [[_0,_0, d]
+               ,[_0,_0,_0]
+               ,[_0,_0,_0]
+               ]
+ex0_3 = sMatrixFromLists (Proxy :: Proxy 3)
+                [[_0,_0,_0]
+                ,[_0,_0,_0]
+                ,[_0,_0,_0]
+                ]
+
+{-
+ex1_1, ex1_2, ex1_3, ex1_4 :: SMatrix 4 (LatencyDistribution IdealizedProbability)
+ex1_1 =
+  sMatrixFromLists (Proxy :: Proxy 4)
+           [[_0, d, d,_0]
+           ,[_0,_0, d, d]
+           ,[_0,_0,_0, d]
+           ,[_0,_0,_0,_0]
+           ]
+ex1_2 =
+   sMatrixFromLists (Proxy :: Proxy 4)
+            [[_0,d∨(d♢d), d,_0]
+            ,[_0,_0,       d, d]
+            ,[_0,_0,      _0, d]
+            ,[_0,_0,      _0,_0]
+            ]
+ -}
+
+
+ex2_1, ex2_2, ex2_3, ex2_4 :: SMatrix 4 (LatencyDistribution IdealizedProbability)
+ex2_1 =
+  sMatrixFromLists (Proxy :: Proxy 4)
+           [[_0, d,_0,_0]
+           ,[_0,_0, d, d]
+           ,[_0,_0,_0, d]
+           ,[_0,_0,_0,_0]
+           ]
+ex2_2 = sMatrixFromLists (Proxy :: Proxy 4)
+                   [[_0,_0,d♢d,d♢d]
+                   ,[_0,_0, d ,d♢d]
+                   ,[_0,_0,_0 , d ]
+                   ,[_0,_0,_0 ,_0 ]
+                   ]
+ex2_3 = sMatrixFromLists (Proxy :: Proxy 4)
+                  [[_0,_0,d♢d,d♢d]
+                  ,[_0,_0,  d,d♢d]
+                  ,[_0,_0,_0 ,d   ]
+                  ,[_0,_0,_0 ,_0 ]
+                  ]
+ex2_4 = sMatrixFromLists (Proxy :: Proxy 4)
+                  [[_0,_0,_0,_0]
+                  ,[_0,_0,_0,_0]
+                  ,[_0,_0,_0,_0]
+                  ,[_0,_0,_0,_0]
+                  ]
+
+d :: LatencyDistribution IdealizedProbability
+d  = [0, 0.45, 0.45]
+_0 = [0]
 ```
 
 To get specs to work we need a notion of matrix dimension.

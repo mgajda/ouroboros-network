@@ -40,6 +40,7 @@ module Probability(IdealizedProbability(..)
 import Data.Ratio((%), Ratio)
 
 import Metric
+import NullUnit
 ```
 
 # Appendix: Probability data type
@@ -63,7 +64,13 @@ class (Complement a
   isValidProbability :: a -> Bool
 
 instance Show IdealizedProbability where
-  showsPrec p (IProb x) = showsPrec p $ realToFrac x
+  showsPrec p (IProb x) = showsPrec p x
+
+instance Unit IdealizedProbability where
+  unitE = 1
+
+instance Null IdealizedProbability where
+  nullE = 0
 
 isValidIdealizedProbability :: IdealizedProbability -> Bool
 isValidIdealizedProbability p = p>= 0 && p<=1.0
@@ -78,6 +85,16 @@ instance Show ApproximateProbability where
 instance Metric ApproximateProbability where
   AProb a `distance` AProb b = abs (a-b)
   similarityThreshold = 0.001
+
+instance Metric IdealizedProbability where
+  IProb a `distance` IProb b = abs $ realToFrac (a-b)
+  similarityThreshold = 0 -- no error allowed
+
+instance Unit ApproximateProbability where
+  unitE = 1
+
+instance Null ApproximateProbability where
+  nullE = 0
 
 instance Probability IdealizedProbability where
   isValidProbability = isValidIdealizedProbability

@@ -14,6 +14,7 @@ bibliography:
 ---
 ```{.haskell .hidden}
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
@@ -21,14 +22,15 @@ bibliography:
 module Network where
 
 import Control.Exception(assert)
-import Data.Matrix
 import GHC.TypeNats
 
-import Series
+import KOutOfN
 import Latency
 import Metric
 import NullUnit
-import KOutOfN
+import Probability
+import Series
+import SMatrix
 ```
 
 # Representing networks
@@ -126,14 +128,23 @@ or optimal diffusion matrix.
 ```{.haskell .literate}
 -- | This computes optimal connections on ΔQ matrix.
 --   TODO: Check that it works both for boolean matrices, and $\deltaQ{}$.
-optimalConnections a = converges 1000 step a
-  where
-    step r = r+a |*| r
+optimalConnections  :: (Probability                     a
+                       ,KnownNat n
+                       ,Real                            a
+                       ,Metric                          a)
+                    => SMatrix   n (LatencyDistribution a)
+                    -> SMatrix   n (LatencyDistribution a)
+optimalConnections a = converges (fromIntegral $ nrows a) (|*|a) a
 
+converges ::  Metric r
+          =>  Int -- ^ max number of steps
+          -> (r -> r)
+          ->  r
+          ->  r
 converges 0      step r = error "Solution did not converge"
 converges aLimit step r = if r ~~ r'
                             then                           r
-                            else converges (aLimit-1) step r'
+                            else converges (pred aLimit) step r'
   where
     r' = step r
 ```
@@ -161,39 +172,27 @@ any starting point $i$ for the duration of $n$ retransmissions. ^[That we do not
 We define a matrix multiplication that uses `firstToFinish` in place of addition
 and `after` in place of multiplication.
 ```{.haskell .literate}
-(|*|) :: TimeToCompletion a => Matrix a -> Matrix a -> Matrix a
-(|*|) = matMult firstToFinish after
+(|*|) :: (Probability                     a
+         ,KnownNat n                       )
+      =>  SMatrix  n (LatencyDistribution a)
+      ->  SMatrix  n (LatencyDistribution a)
+      ->  SMatrix  n (LatencyDistribution a)
+(|*|)  = sMatMult firstToFinish after
 ```
 
-Definition of parametrized matrix multiplication is standard, so
-we can test it over other objects with defined multiplication and addition-like
-operators.
-_(We can optimize this definition later, if it turns out to be bottleneck.)_
-```{.haskell .literate}
-matMult :: (a -> a -> a) -> (a -> a -> a) -> Matrix a -> Matrix a -> Matrix a
-matMult add mul a1 a2 = assert (n' == m) $
-    matrix n m' gen
-  where
-    gen (i,j) = foldr1 add
-                       [ (a1 ! (i,k)) `mul` (a2 ! (k,j))
-                         | k <- [1 .. m] ]
-    n  = nrows a1
-    m  = ncols a1
-    n' = nrows a2
-    m' = ncols a2
-```
 Note that to measure convergence of the process, we need a notion of distance
 between two matrices.
 
 Here, we use Frobenius distance between matrices, parametrized by the notion
 of distance between any two matrix elements.
 ```{.haskell .literate}
-instance Metric         a
-      => Metric (Matrix a) where
+instance (Metric            a
+         ,KnownNat        n  )
+      =>  Metric (SMatrix n a) where
   a `distance` b = assert ((n==n') && (m==m'))
                  $ sqrt
                  $ sum [square ((a !(i,k)) `distance` (b ! (i,k)))
-                         | i <- [1..n], k<-[1..m]]
+                         | i <- allUpTo, k<-allUpTo]
     where
       square x = x*x
       n  = nrows a
