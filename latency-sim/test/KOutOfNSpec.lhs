@@ -18,6 +18,7 @@ bibliography:
 {-# LANGUAGE ScopedTypeVariables #-}
 module KOutOfNSpec where
 
+import Data.Foldable(toList)
 import Data.List(iterate')
 
 import KOutOfN
@@ -103,19 +104,22 @@ spec = do
       connMatrix :: SMatrix 7 (LatencyDistribution ApproximateProbability)
                  <- generate
                   $ resize testSize arbitrary
+      putStrLn $ "Dim of input matrix" ++ showDim connMatrix
       let avg = averageKOutOfN connMatrix
-      putStrLn $ showDim avg ""
+      putStrLn $ "Dim of avg " ++ showDim avg
       saveSurface "input_surface.txt" avg
       let iterated = iterate' (|*|connMatrix) connMatrix !! testSize
+      putStrLn $ "Dim of iterated " ++ showDim iterated
       saveSurface "after10.txt" $ averageKOutOfN iterated
 
-showDim :: Show a
-        => Series (LatencyDistribution a)
-        -> ShowS
-showDim  = withLines . map ldSize . unSeries
+showDim :: (Show       a
+           ,Foldable f  )
+        => f (LatencyDistribution a)
+        -> String
+showDim f = show $ maximum $ map ldSize $ toList f
   where
-    ldSize :: Show a => LatencyDistribution a -> ShowS
-    ldSize (LatencyDistribution (Series s)) = shows $ length s
+    ldSize :: Show a => LatencyDistribution a -> Int
+    ldSize (LatencyDistribution (Series s)) = length s
 
 testSize = 5
 ```
