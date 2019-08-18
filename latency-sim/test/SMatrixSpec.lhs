@@ -40,6 +40,9 @@ import qualified Data.Matrix as DM
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Modifiers
+import Test.Validity.Eq
+import Test.Validity.Shrinking
+import Test.Validity.Arbitrary
 import Test.Hspec
 import Test.Hspec.QuickCheck
 
@@ -149,6 +152,12 @@ complexMatrix c = sMatrixFromLists (Proxy :: Proxy 2)
     re = realPart c
     im = imagPart c
 
+smatrixSpec =
+  describe "SomeSMatrix" $ do
+    eqSpecOnValid   @(SomeSMatrix Integer)
+    shrinkValidSpec @(SomeSMatrix Integer)
+    arbitrarySpec   @(SomeSMatrix Integer)
+
 spec = do
   describe "Example operations on SMatrices" $ do
     it "SMatrix of size 1 is just a number" $ do
@@ -162,9 +171,6 @@ spec = do
         complexMatrix a |*| complexMatrix b == complexMatrix (a*b)
 
   it "truthy" $ True `shouldBe` True
-  --eqSpecOnValid @(SMatrix 4 Int)
-  --shrinkValidSpec @(SomeSMatrix Integer)
-  --arbitrarySpec   @(SomeSMatrix Integer)
   {-describe "check properties of integers" $ do
     specAddOnGen  $ pure (arbitrary :: Gen Integer)
     specMulOnGen  $ pure (arbitrary :: Gen Integer)

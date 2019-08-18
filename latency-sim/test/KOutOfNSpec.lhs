@@ -71,7 +71,7 @@ bernoulliSpec probSuccess numTrials =
 ```
 
 Now we can express it as a QuickCheck property:
-```{.haskell.literate}
+```{.haskell .literate}
 bernoulliProperty p (Positive n) = kOutOfN (Series (replicate (fromInteger n) p))
                                 == bernoulliSpec (p::Probability) (n::Integer)
 ```

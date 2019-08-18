@@ -37,6 +37,7 @@ import Numeric.Natural
 
 import NullUnit
 import qualified Data.Matrix as DM
+import Unsafe.Coerce(unsafeCoerce)
 ```
 ## Square matrices of declared size
 
@@ -80,6 +81,9 @@ newtype SMatrix (n::Nat) a = SMatrix { unSMatrix :: DM.Matrix a }
 ```{.haskell .literate}
 size :: KnownNat n => SMatrix n a -> Int
 size (s :: SMatrix n a)= intVal (Proxy :: Proxy n)
+
+sizeProxy :: KnownNat n => SMatrix n a -> Proxy n
+sizeProxy _ = Proxy
 
 intVal :: KnownNat n => Proxy n -> Int
 intVal = fromIntegral . natVal
@@ -174,13 +178,42 @@ data SomeSMatrix a =
     deriving (Typeable)
 
 instance Eq a => Eq (SomeSMatrix a) where
-  SomeSMatrix a == SomeSMatrix b = False
+  SomeSMatrix a == SomeSMatrix b =
+    if size a == size b
+      then a == unsafeCoerce b
+      else False
 
 instance Show a => Show (SomeSMatrix a) where
-  showsPrec _ (SomeSMatrix sm) = ("SMatrix " ++) . shows sm
+  showsPrec _ (SomeSMatrix sm) = ("SomeSMatrix " ++) . shows sm
 
 someSMatrix :: [a] -> SomeSMatrix a
-someSMatrix  = undefined
+someSMatrix (aList :: [a]) =
+    case intSqrt (length aList) of
+      Nothing -> error $ "Length of list given to someSMatrix should be a square of a natural number."
+      Just n  ->
+        let aNat = someNatVal n
+        in case aNat of
+             Just (SomeNat (theNat :: Proxy n)) ->
+               SomeSMatrix $ sMatrixFromList' theNat aList
+             Nothing -> error "Impossible in someSMatrix"
+
+
+sMatrixFromList' :: KnownNat n => Proxy n -> [a] -> SMatrix n a
+sMatrixFromList' p@(Proxy :: Proxy n) aList =
+  SMatrix $
+    DM.fromList (intVal p) (intVal p) aList
+--                   (SMatrix :: [a] -> SMatrix n a)
+--                  DM.fromList (intVal theNat) (intVal theNat) aList
+sMatrixFromList :: KnownNat n => [a] -> SMatrix n a
+sMatrixFromList  = sMatrixFromList' Proxy
+
+intSqrt :: Int -> Maybe Integer
+intSqrt i = case iSqrt i of
+              n | n*n==fromIntegral i -> Just n
+              otherwise               -> Nothing
+  where
+    iSqrt :: Int -> Integer
+    iSqrt = floor . sqrt . fromIntegral
 ```
 
 One might also want to iterate over rows or columns in the matrix:
