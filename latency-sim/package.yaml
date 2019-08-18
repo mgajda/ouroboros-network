@@ -35,6 +35,7 @@ library:
     - validity
     - genvalidity
     - http-client
+    - uniplate
   build-tools:
     - markdown-unlit
     - pandoc

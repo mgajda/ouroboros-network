@@ -20,16 +20,21 @@ bibliography:
 ---
 
 ```{.haskell .hidden}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE TypeOperators     #-}
-{-# LANGUAGE UnicodeSyntax     #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UnicodeSyntax              #-}
+{-# LANGUAGE ViewPatterns               #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
 module Delay where
 
+import GHC.Generics
+import Data.Typeable
+import Data.Data
 import Test.QuickCheck
 
 ```
@@ -38,7 +43,7 @@ import Test.QuickCheck
 <a name="delay">Discrete delays</a> are defined as:
 ```{.haskell .literate}
 newtype Delay       = Delay { unDelay :: Int } 
-  deriving (Num, Ord, Eq, Enum, Bounded, CoArbitrary, Show)
+  deriving (Num, Ord, Eq, Enum, Bounded, CoArbitrary, Show, Data, Typeable, Generic)
 
 instance Arbitrary Delay where
   arbitrary = getNonNegative <$> arbitrary
