@@ -80,7 +80,7 @@ spec = do
       it "delay" $
         show (Wait 1) `shouldBe` "+1t"
       it "d\\/d" $
-        show (Alt ["d","d"]) `shouldBe` "d\\/d"
+        show (Alt  ["d","d"]) `shouldBe` "d\\/d"
       it "d/\\d" $
         show (Conj ["d","d"]) `shouldBe` "d/\\d"
       it "d;d" $
@@ -93,14 +93,14 @@ spec = do
           `shouldBe` "d;d\\/d;d;d"
   describe "laws" $ do
     describe "alt" $ do
-      prop "commutative" $ commutative alt
-      prop "associative" $ associative alt
+      prop "commutative" $ commutativeOnValids alt
+      prop "associative" $ associativeOnValids alt
     describe "conj" $ do
-      prop "commutative" $ commutative conj
-      prop "associative" $ associative conj
+      prop "commutative" $ commutativeOnValids conj
+      prop "associative" $ associativeOnValids conj
     describe "mul" $ do
-      prop "commutative" $ commutative mul
-      prop "associative" $ associative mul
+      prop "commutative" $ commutativeOnValids mul
+      prop "associative" $ associativeOnValids mul
   describe "classes" $ do
     eqSpecOnValid     @FreeTTC
     genValidSpec      @FreeTTC

@@ -89,31 +89,49 @@ joinsPrec opCode opPrec prec args =
   joinWith   opCode         $
   map (showsPrec opPrec) args
 
-fromAlt (Alt alts) = alts
-fromAlt (Keep 0.0) = []
-fromAlt  other     = [other]
+fromAlt (Alt alts) = Right alts
+fromAlt (Keep 0.0) = Right []
+fromAlt (Keep 1  ) = Left (Keep 1)
+fromAlt (Wait 0  ) = Left (Keep 1)
+fromAlt  other     = Right [other]
 
-fromMul (Mul coefs) = coefs
-fromMul (Keep 1.0 ) = []
-fromMul  other      = [other]
+fromMul (Mul coefs) = Right coefs
+fromMul (Keep 1   ) = Right []
+fromMul (Wait 0   ) = Right []
+fromMul (Keep 0   ) = Left (Keep 0)
+fromMul  other      = Right [other]
 
-fromConj (Conj  coefs) = coefs
-fromConj (Keep  1.0  ) = []
-fromConj (Wait  0    ) = []
-fromConj  other        = [other]
+fromConj (Conj  coefs) = Right coefs
+fromConj (Keep  1.0  ) = Right []
+fromConj (Wait  0    ) = Right []
+fromConj (Keep  0.0  ) = Left (Keep 0)
+fromConj  other        = Right [other]
 
+-- | Simple rewrite step of simplification
 -- Reducing with neutral elements
-simpXform (Mul  [] ) = noDelay -- == Keep 1
-simpXform (Alt  [] ) = allLost
-simpXform (Conj [] ) = noDelay
-simpXform (Keep 1.0) = noDelay
 -- Unlifting associative parentheses
-simpXform (Alt  as ) = Alt  $ sort $ concatMap fromAlt  as
-simpXform (Mul  ms ) = Mul  $ sort $ concatMap fromMul  ms
-simpXform (Conj cs ) = Conj $ sort $ concatMap fromConj cs
-simpXform  other     = other
+simpFlatten (Alt  as ) = simpTemplate Alt  fromAlt  as
+simpFlatten (Mul  ms ) = simpTemplate Mul  fromMul  ms
+simpFlatten (Conj cs ) = simpTemplate Conj fromConj cs
+simpFlatten  other     = other
 
-simplify = transform simpXform
+simpNeutral (Mul  [] ) = noDelay -- == Keep 1
+simpNeutral (Alt  [] ) = allLost
+simpNeutral (Conj [] ) = noDelay
+simpNeutral (Keep 1.0) = noDelay
+simpNeutral  other     = other
+
+-- | Template for operator simplification
+simpTemplate :: ([FreeTTC] -> FreeTTC)
+             -> (FreeTTC   -> Either FreeTTC [FreeTTC])
+             -> [FreeTTC]
+             ->  FreeTTC
+simpTemplate cons extract args =
+  case sequenceA $ map extract args of
+    Left  nullElt -> nullElt
+    Right result  -> cons $ sort $ concat result
+
+simplify = transform (simpNeutral . simpFlatten)
 -- TODO: add reduction of constant-exprs? (Keep, Delay)
 
 instance IsString FreeTTC where
