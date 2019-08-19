@@ -81,11 +81,6 @@ bernoulliProperty p (Positive n) = kOutOfN (Series (replicate (fromInteger n) p)
 (|*|) = sMatMult firstToFinish Latency.after
 spec = do
   describe "showing surfaces" $ do
-    it "withLines" $
-      withLines [("Alpha"++), ("Beta"++), ("Gamma"++)] ""
-        `shouldBe` "Alpha\nBeta\nGamma"
-    it "joins" $
-      joins ("Alpha"++) ("Beta"++) "" `shouldBe` "Alpha\nBeta"
     it "showPoint" $
       showPoint showProb 1 2 3 "" `shouldBe` "1 2 3.0"
     it "showCurve" $

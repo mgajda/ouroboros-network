@@ -27,11 +27,12 @@ module KOutOfN where
 
 import GHC.TypeLits(KnownNat)
 import Data.Function(on)
-import SMatrix
 
 import Complement
 import Latency
 import Series
+import ShowUtils
+import SMatrix
 import Probability
 ```
 # Histogramming
@@ -151,7 +152,7 @@ NOTE:
 ```{.haskell .hidden}
 saveSurface :: FilePath -> Series LatencyDistribution -> IO ()
 saveSurface fp curves = writeFile fp
-                      $ withLines content ""
+                      $ joinLines content ""
   where
     content :: [ShowS]
     content = zipWith (showCurve showProb) [0..] (unpack <$> unSeries curves)
@@ -159,14 +160,8 @@ saveSurface fp curves = writeFile fp
     unpack (LatencyDistribution (Series ls)) = ls
 
 showCurve :: (a -> ShowS) -> Int -> [a] -> ShowS
-showCurve f i = withLines
+showCurve f i = joinLines
               . zipWith (showPoint f i) [0..]
-
-withLines :: [ShowS] -> ShowS
-withLines  = foldr1 joins
-
-joins :: ShowS -> ShowS -> ShowS
-joins a b  = a . ('\n':) . b
 
 showProb :: Probability -> ShowS
 showProb (Prob x) = (shows :: Double -> ShowS) (realToFrac x)
