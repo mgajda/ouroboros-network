@@ -5,7 +5,8 @@ module ShowUtils where
 Joins a list of `ShowS` functions with separators.
 ```{.haskell .literate}
 joinWith :: ShowS -> [ShowS] -> ShowS
-joinWith sep = foldr1 $ joins sep
+joinWith _   []   = id
+joinWith sep args = joins sep `foldr1` args
 
 joins :: ShowS -> ShowS -> ShowS -> ShowS
 joins sep a b  = a . sep . b

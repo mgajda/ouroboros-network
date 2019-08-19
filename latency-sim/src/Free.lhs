@@ -28,6 +28,7 @@ bibliography:
 {-# LANGUAGE ViewPatterns               #-}
 module Free(
     FreeTTC(..)
+  , TVar(..)
   , simplify
   ) where
 
@@ -37,6 +38,7 @@ import Data.Function(on)
 import Data.String
 import Data.List(partition,sort)
 import Data.Maybe
+import Data.Ratio
 import Data.Semigroup
 import Data.Typeable
 import GHC.Generics
@@ -58,9 +60,15 @@ Here we interpret `TimeToCompletion` as free algebra to get algebraic descriptio
 of our test cases.
 
 ```{.haskell .literate}
+newtype TVar = TVar Char
+  deriving (Eq, Ord, Data, Typeable, Generic)
+
+instance Show TVar where
+  showsPrec _ (TVar c) = (c:)
+
 data FreeTTC =
-    Var   Char
-  | Keep  Double
+    Var   TVar
+  | Keep  Probability
   | Wait  Delay
   | Alt  [FreeTTC]
   | Conj [FreeTTC]
@@ -68,8 +76,9 @@ data FreeTTC =
   deriving (Eq, Ord, Data, Typeable, Generic)
 
 instance Show FreeTTC where
-  showsPrec p (Var      c) = (c:)
-  showsPrec p (Keep     k) = shows k
+  showsPrec p (Var  v) = showsPrec p v
+  showsPrec p (Keep (Prob a)) | denominator a == 1 = shows $ numerator a
+  showsPrec p (Keep (Prob k)) = shows k
   showsPrec p (Wait (Delay d)) = ('+':) . shows d . ('t':)
   showsPrec p (Alt   alts) = joinsPrec ("\\/"++) 5 p alts
   showsPrec p (Conj conjs) = joinsPrec ("/\\"++) 7 p conjs
@@ -93,17 +102,22 @@ fromConj (Keep  1.0  ) = []
 fromConj (Wait  0    ) = []
 fromConj  other        = [other]
 
+-- Reducing with neutral elements
+simpXform (Mul  [] ) = noDelay -- == Keep 1
+simpXform (Alt  [] ) = allLost
+simpXform (Conj [] ) = noDelay
+simpXform (Keep 1.0) = noDelay
+-- Unlifting associative parentheses
 simpXform (Alt  as ) = Alt  $ sort $ concatMap fromAlt  as
 simpXform (Mul  ms ) = Mul  $ sort $ concatMap fromMul  ms
 simpXform (Conj cs ) = Conj $ sort $ concatMap fromConj cs
-simpXform (Keep 1.0) = Wait 0
 simpXform  other     = other
 
 simplify = transform simpXform
 -- TODO: add reduction of constant-exprs? (Keep, Delay)
 
 instance IsString FreeTTC where
-  fromString [c]   = Var c
+  fromString [c]   = Var (TVar c)
   fromString other = error $ "Only single character strings are allowed as FreeTTC variables. Got: "
                           ++ show other
 

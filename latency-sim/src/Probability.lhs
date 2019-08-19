@@ -20,17 +20,23 @@ bibliography:
 ---
 
 ```{.haskell .hidden}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedLists   #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE TypeOperators     #-}
-{-# LANGUAGE UnicodeSyntax     #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE OverloadedLists            #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UnicodeSyntax              #-}
+{-# LANGUAGE ViewPatterns               #-}
 module Probability(Probability(..)
                   ,isValidProbability) where
+
+import Data.Data
+import Data.Typeable
+import GHC.Generics
 
 import Data.Ratio((%), Ratio)
 
@@ -44,7 +50,7 @@ is defined here for reference:
 -- | Between 0.0 and 1.0
 newtype Probability = Prob { unProb :: Ratio Integer }
   deriving (Num, Fractional, Real, Ord, Eq,
-            Read, Show)
+            Read, Show, Data, Typeable, Generic)
 
 isValidProbability :: Probability -> Bool
 isValidProbability p = p>= 0 && p<=1.0

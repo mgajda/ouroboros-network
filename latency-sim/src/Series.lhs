@@ -266,5 +266,5 @@ number of simulations we can quickly run when checking distributions
 in the unit tests (10k by default).
 
 ```{.haskell .literate .hidden}
-spec = quickCheckAll
+quickchecked = quickCheckAll
 ```

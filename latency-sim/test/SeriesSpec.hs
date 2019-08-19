@@ -22,7 +22,9 @@ import Test.Validity.Shrinking
 import GHC.Exts(IsList(..))
 
 import Delay
-import Series hiding (spec)
+import Series
+
+import DelaySpec  hiding (spec)
 
 deriving instance Validity     a => Validity     (Series a)
 deriving instance GenValid     a => GenValid     (Series a)
@@ -109,7 +111,11 @@ spec = do
     prop "results of extension have the length of longer" $ \a b c ->
       let (a', b') = extendToSameLength c (a::Series Double, a <> b::Series Double)
       in length a' `shouldBe` (length a + length b)
-  eqSpecOnValid   @(Series Int)
-  showReadSpec    @(Series Int)
-  shrinkValidSpec @(Series Int)
-  arbitrarySpec   @(Series Int)
+  describe "classes" $ do
+    eqSpecOnValid   @(Series Int)
+    showReadSpec    @(Series Int)
+    shrinkValidSpec @(Series Int)
+    arbitrarySpec   @(Series Int)
+  -- TODO:
+  --it "quickcheck properties" $ do
+  --  quickchecked -- properties described in Series module

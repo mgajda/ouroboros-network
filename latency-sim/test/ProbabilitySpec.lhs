@@ -18,6 +18,8 @@ import Test.Validity
 instance Validity Probability where
   validate p = check (p>=0) "probability is greater than 0.0"
             <> check (p<=1) "probability is less than 1.0"
+  --        <> (not $ isInfinite p) `check` "probability must be finite"
+  --        <> (not $ isNaN      p) `check` "probability cannot be NaN"
 
 instance GenUnchecked Probability where
   genUnchecked    = arbitrary
