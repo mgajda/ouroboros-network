@@ -49,6 +49,7 @@ import Probability
 import Delay
 import Latency
 import Series
+import ShowUtils
 import Metric
 import NullUnit
 import Complement
@@ -65,6 +66,19 @@ data FreeTTC =
   | Conj [FreeTTC]
   | Mul  [FreeTTC]
   deriving (Eq, Ord, Data, Typeable, Generic)
+
+instance Show FreeTTC where
+  showsPrec p (Var      c) = (c:)
+  showsPrec p (Keep     k) = shows k
+  showsPrec p (Wait (Delay d)) = ('+':) . shows d . ('t':)
+  showsPrec p (Alt   alts) = joinsPrec ("\\/"++) 5 p alts
+  showsPrec p (Conj conjs) = joinsPrec ("/\\"++) 7 p conjs
+  showsPrec p (Mul   muls) = joinsPrec (";"  ++) 9 p muls
+
+joinsPrec opCode opPrec prec args =
+  showParen (prec > opPrec) $
+  joinWith   opCode         $
+  map (showsPrec opPrec) args
 
 fromAlt (Alt alts) = alts
 fromAlt (Keep 0.0) = []
