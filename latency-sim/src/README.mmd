@@ -4,6 +4,7 @@ author:
   - Karl      Knutsson
   - Duncan    Coutts
   - Marcin    Szamotulski
+  - Lars      Bruenjes
 title: Curious properties of latency distributions
 abstract: |
   Network latency distributions, their algebra, and use examples.
@@ -17,6 +18,13 @@ output:
     mainfont: "DejaVu Serif"
     sansfont: Arial
     latex_engine: xelatex
+header-includes: |
+  \renewenvironment{verbatim}{%
+    \VerbatimEnvironment
+    \begin{Verbatim}[breaklines]%
+  }{%
+    \end{Verbatim}%
+  }
 bibliography:
   - Latency.bib
 ---
