@@ -13,7 +13,6 @@ Probability.lhs
 Series.lhs
 ../test/LatencySpec.lhs
 ../test/NetworkSpec.lhs
-Complement.lhs
 Metric.lhs
 NullUnit.lhs
 SMatrix.lhs
