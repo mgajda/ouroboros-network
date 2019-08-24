@@ -10,13 +10,13 @@ echo "Making hide-codeblocks filter"
 stack build latency-sim:exe:pandoc-hide-codeblocks # for `hide-codeblocks`
 
 echo "Making TEX"
-stack exec -- pandoc ${OPTS} ${DOCOPTS}          --variable mainfont="DejaVu Serif" --variable sansfont="Fira Code" --standalone --to=latex ${INPUTS} -o ${NAME}.tex --standalone
+stack exec -- pandoc ${OPTS} ${DOCOPTS} --standalone --to=latex             ${INPUTS} -o ${NAME}.tex
 
 echo "Making PDF"
-stack exec -- pandoc ${OPTS} ${DOCOPTS}          --variable mainfont="DejaVu Serif" --variable sansfont="Arial"                         ${INPUTS} -o ${NAME}.pdf
+stack exec -- pandoc ${OPTS} ${DOCOPTS}                                     ${INPUTS} -o ${NAME}.pdf
 
 echo "Making .html"
-stack exec -- pandoc ${OPTS} ${DOCOPTS} --mathml --variable mainfont="DejaVu Serif" --variable sansfont="Arial"                                 ${INPUTS} -o ${NAME}.html --highlight-style=espresso
+stack exec -- pandoc ${OPTS} ${DOCOPTS} --mathml --highlight-style=espresso ${INPUTS} -o ${NAME}.html
 
 echo "Building .lhs to check source code is valid"
 stack build
