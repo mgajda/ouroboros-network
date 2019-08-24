@@ -20,8 +20,10 @@ bibliography:
 ---
 
 ```{.haskell .hidden}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE RankNTypes        #-}
@@ -37,6 +39,10 @@ module Probability(IdealizedProbability(..)
                   ,Complement(..)
                   ) where
 
+import Data.Data
+import Data.Typeable
+import GHC.Generics
+
 import Data.Ratio((%), Ratio)
 
 import Metric
@@ -51,7 +57,7 @@ is defined here for reference:
 -- | Between 0.0 and 1.0
 newtype IdealizedProbability = IProb { unIProb :: Ratio Integer }
   deriving (Num, Fractional, Real, Ord, Eq,
-            Read, Enum)
+            Data, Typeable, Generic, Enum)
 
 class (Complement a
       ,Fractional a
@@ -77,7 +83,7 @@ isValidIdealizedProbability p = p>= 0 && p<=1.0
 
 newtype ApproximateProbability = AProb { unAProb :: Double }
   deriving (Num, Fractional, Real, Ord, Eq,
-            Read, Enum)
+            Data, Typeable, Generic, Enum)
 
 instance Show ApproximateProbability where
   showsPrec p (AProb x) = showsPrec p x

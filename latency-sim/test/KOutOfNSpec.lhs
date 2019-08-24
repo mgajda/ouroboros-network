@@ -82,7 +82,7 @@ bernoulliSpec probSuccess numTrials =
 ```
 
 Now we can express it as a QuickCheck property:
-```{.haskell.literate}
+```{.haskell .literate}
 bernoulliProperty p (Positive n) = kOutOfN (Series (replicate (fromInteger n) p))
                                 == bernoulliSpec p (n::Integer)
 ```
@@ -117,11 +117,6 @@ lengthOfAveragedIncreasesByOne m = case m of
 
 spec = do
   describe "showing surfaces" $ do
-    it "withLines" $
-      withLines [("Alpha"++), ("Beta"++), ("Gamma"++)] ""
-        `shouldBe` "Alpha\nBeta\nGamma"
-    it "joins" $
-      joins ("Alpha"++) ("Beta"++) "" `shouldBe` "Alpha\nBeta"
     it "showPoint" $
       showPoint 1 2 3 "" `shouldBe` "1 2 3"
     it "showCurve" $

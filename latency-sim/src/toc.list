@@ -8,6 +8,7 @@ KOutOfN.lhs
 Network.lhs
 closure.mmd
 Delay.lhs
+../test/DelaySpec.lhs
 Probability.lhs
 ../test/ProbabilitySpec.lhs
 Series.lhs
@@ -17,4 +18,8 @@ Metric.lhs
 NullUnit.lhs
 SMatrix.lhs
 ../test/SMatrixSpec.lhs
+Free.lhs
+../test/FreeSpec.lhs
+ShowUtils.lhs
+../test/ShowUtilsSpec.lhs
 epilogue.mmd

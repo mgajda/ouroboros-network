@@ -20,29 +20,31 @@ bibliography:
 ---
 
 ```{.haskell .hidden}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE TypeOperators     #-}
-{-# LANGUAGE UnicodeSyntax     #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UnicodeSyntax              #-}
+{-# LANGUAGE ViewPatterns               #-}
 module Delay where
 
-import Test.QuickCheck
+import GHC.Generics
+import Data.Typeable
+import Data.Data
 
 ```
 # Appendix: Discrete delay
 
 <a name="delay">Discrete delays</a> are defined as:
 ```{.haskell .literate}
-newtype Delay       = Delay { unDelay :: Int } 
-  deriving (Num, Ord, Eq, Enum, Bounded, CoArbitrary, Show)
-
-instance Arbitrary Delay where
-  arbitrary = getNonNegative <$> arbitrary
-  shrink (Delay d) = Delay <$> shrinkIntegral d
+newtype Delay = Delay { unDelay :: Int } 
+  deriving (Num, Ord, Eq, Enum, Bounded, Show, Data, Typeable, Generic)
 
 isValidDelay :: Delay -> Bool
 isValidDelay (Delay d) = d>=0

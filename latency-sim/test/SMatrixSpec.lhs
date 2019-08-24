@@ -41,7 +41,14 @@ import qualified Data.Matrix as DM
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Modifiers
+<<<<<<< HEAD
 import Test.Hspec hiding (after)
+=======
+import Test.Validity.Eq
+import Test.Validity.Shrinking
+import Test.Validity.Arbitrary
+import Test.Hspec
+>>>>>>> 1a763ecbcc7b459d855f74b3ac7e5262004cda28
 import Test.Hspec.QuickCheck
 
 import Latency
@@ -150,6 +157,12 @@ complexMatrix c = sMatrixFromLists (Proxy :: Proxy 2)
     re = realPart c
     im = imagPart c
 
+smatrixSpec =
+  describe "SomeSMatrix" $ do
+    eqSpecOnValid   @(SomeSMatrix Integer)
+    shrinkValidSpec @(SomeSMatrix Integer)
+    arbitrarySpec   @(SomeSMatrix Integer)
+
 spec = do
   describe "Example operations on SMatrices" $ do
     it "SMatrix of size 1 is just a number" $ do
@@ -161,9 +174,14 @@ spec = do
     describe "complex numbers as matrices" $ do
       prop "multiplication" $ \a (b :: Complex Double) ->
         complexMatrix a |*| complexMatrix b == complexMatrix (a*b)
+<<<<<<< HEAD
   --eqSpecOnValid   @(SomeSMatrix Integer)
   --shrinkValidSpec @(SomeSMatrix Integer)
   --arbitrarySpec   @(SomeSMatrix Integer)
+=======
+
+  it "truthy" $ True `shouldBe` True
+>>>>>>> 1a763ecbcc7b459d855f74b3ac7e5262004cda28
   {-describe "check properties of integers" $ do
     specAddOnGen  $ pure (arbitrary :: Gen Integer)
     specMulOnGen  $ pure (arbitrary :: Gen Integer)

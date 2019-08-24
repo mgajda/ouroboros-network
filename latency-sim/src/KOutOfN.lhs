@@ -32,6 +32,7 @@ import Data.Ratio
 import Latency
 import Probability
 import Series
+import ShowUtils
 import SMatrix
 
 import Debug.Trace(trace)
@@ -172,7 +173,7 @@ NOTE:
 saveSurface :: Show a
             => FilePath -> Series (LatencyDistribution a) -> IO ()
 saveSurface fp curves = writeFile fp
-                      $ withLines content ""
+                      $ joinLines content ""
   where
     content :: [ShowS]
     content = zipWith showCurve [0..] (unpack <$> unSeries curves)
@@ -180,14 +181,8 @@ saveSurface fp curves = writeFile fp
     unpack (LatencyDistribution (Series ls)) = ls
 
 showCurve :: Show a => Int -> [a] -> ShowS
-showCurve i = withLines
+showCurve i = joinLines
             . zipWith (showPoint i) [0..]
-
-withLines :: [ShowS] -> ShowS
-withLines  = foldr1 joins
-
-joins :: ShowS -> ShowS -> ShowS
-joins a b  = a . ('\n':) . b
 
 showPoint :: Show a => Int -> Int -> a -> ShowS
 showPoint i j v = shows i
