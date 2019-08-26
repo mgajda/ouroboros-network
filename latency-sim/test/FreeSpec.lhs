@@ -88,6 +88,8 @@ spec = do
     it "simplify Alt  a 0" $ simplify (Alt  ["a", nullE]) `shouldBe` "a"
     it "simplify Mul  a 0" $ simplify (Mul  ["a", nullE]) `shouldBe` nullE
     it "simplify Conj a 0" $ simplify (Conj ["a", nullE]) `shouldBe` nullE
+    it "simplify d;0 without showing" $
+      simplify (Mul  ["d",nullE]) `shouldBe` nullE
   describe "sorting" $ do
     it "a b"   $ sort ["a",     "b"    ] `shouldBe` ["a", "b"         :: FreeTTC]
     it "b a"   $ sort ["b",     "a"    ] `shouldBe` ["a", "b"         :: FreeTTC]
@@ -116,8 +118,6 @@ spec = do
         showTTC (Mul  ["d","d"]) `shouldBe` "d;d"
       it "d;0" $
         showTTC (simplify (Mul  ["d",nullE])) `shouldBe` "0"
-      it "d;0 ++" $
-        simplify (Mul  ["d",nullE]) `shouldBe` nullE
       it "d;d" $
         showTTC (Alt  [Mul  ["d","d"], "d"]) `shouldBe` showTTC (Alt  ["d", Mul  ["d","d"]])
     describe "combos" $ do
