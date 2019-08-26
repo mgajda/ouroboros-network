@@ -30,6 +30,9 @@ module Free(
     FreeTTC(..)
   , TVar(..)
   , simplify
+  --, simpNeutral
+  --, simpFlatten
+  , showTTC
   ) where
 
 import GHC.Exts(IsList(..))
@@ -75,18 +78,27 @@ data FreeTTC =
   deriving (Eq, Ord, Data, Typeable, Generic)
 
 instance Show FreeTTC where
-  showsPrec p (Var  v) = showsPrec p v
-  showsPrec p (Keep (IProb a)) | denominator a == 1 = shows $ numerator a
-  showsPrec p (Keep (IProb k)) = shows k
-  showsPrec p (Wait (Delay d)) = ('+':) . shows d . ('t':)
-  showsPrec p (Alt   alts) = joinsPrec ("\\/"++) 5 p alts
-  showsPrec p (Conj conjs) = joinsPrec ("/\\"++) 7 p conjs
-  showsPrec p (Mul   muls) = joinsPrec (";"  ++) 9 p muls
+  showsPrec = showsTTC
 
+showTTC :: FreeTTC -> String
+showTTC arg = showsTTC 0 (simplify arg) ""
+
+showsTTC  :: Int -> FreeTTC -> ShowS
+showsTTC p = go p . simplify
+    where
+      go p (Var  v) = showsPrec p v
+      go p (Keep (IProb a)) | denominator a == 1 = shows $ numerator a
+      go p (Keep (IProb k)) = shows k
+      go p (Wait (Delay d)) = ('+':) . shows d . ('t':)
+      go p (Alt   alts) = joinsPrec ("∨"++) 5 p alts
+      go p (Conj conjs) = joinsPrec ("∧"++) 7 p conjs
+      go p (Mul   muls) = joinsPrec (";"  ++) 9 p muls
+
+joinsPrec :: ShowS -> Int -> Int -> [FreeTTC] -> ShowS
 joinsPrec opCode opPrec prec args =
   showParen (prec > opPrec) $
   joinWith   opCode         $
-  map (showsPrec opPrec) args
+  map (showsTTC opPrec) args
 
 fromAlt (Alt alts) = Right alts
 fromAlt (Keep 0.0) = Right []
@@ -126,10 +138,12 @@ simpTemplate :: ([FreeTTC] -> FreeTTC)
              -> [FreeTTC]
              ->  FreeTTC
 simpTemplate cons extract args =
-  case sequenceA $ map extract args of
-    Left  nullElt -> nullElt
-    Right result  -> cons $ sort $ concat result
+  case fmap concat $ sequenceA $ map extract args of
+    Left  nullElt  -> nullElt
+    Right [result] -> result -- eliminate constructor, if only a single result
+    Right result   -> cons $ sort result
 
+simplify :: FreeTTC -> FreeTTC
 simplify = transform (simpNeutral . simpFlatten)
 -- TODO: add reduction of constant-exprs? (Keep, Delay)
 
@@ -138,7 +152,7 @@ instance IsString FreeTTC where
   fromString other = error $ "Only single character strings are allowed as FreeTTC variables. Got: "
                           ++ show other
 
-dyadic op a b = op [a,b]
+dyadic op a b = simplify $ op [a,b]
 
 instance TimeToCompletion FreeTTC where
   firstToFinish = dyadic Alt
@@ -148,7 +162,16 @@ instance TimeToCompletion FreeTTC where
   allLost       = Keep 0
   noDelay       = Keep 1
 
+instance Metric FreeTTC where
+  a `distance` b | a == b = 0
+  a `distance` b          = 1
+  similarityThreshold     = 0.001
 
+instance Null FreeTTC where
+  nullE = Keep 0
+
+instance Unit FreeTTC where
+  unitE = Keep 1
 ```
 
 

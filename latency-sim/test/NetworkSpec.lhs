@@ -17,13 +17,17 @@ bibliography:
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE OverloadedLists            #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE PartialTypeSignatures      #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TypeApplications           #-}
 module NetworkSpec where
 
+import Free
 import Latency
+import Metric
 import Network
 import NullUnit
 import Probability
@@ -239,41 +243,19 @@ a `sameDim` b = (nrows a == nrows b)
 
 Test that type class instances are valid:
 ```{.haskell .literate}
-spec = it "truthy" $ True `shouldBe` True
+spec = do
   {-describe "check properties of integers" $ do
     specAddOnGen  $ pure $ GenIN (arbitrary :: Gen Integer) 0 0
     specMulOnGen  $ pure $ GenIN (arbitrary :: Gen Integer) 1 0
   describe "check properties of matrices of integers" $ do
     specAddOnGen  $ swapGenConnMatrix $ genGenConnMatrix @Integer
     specMulOnGen  $ genGenConnMatrix @Integer-}
-  {-describe "Examples discussed" $ do
-    describe "Example 0" $ do
-      it "Second iteration" $
-        ex0_1 *** ex0_1                     `shouldBeSimilar` ex0_2
-      it "Third iteration" $
-        ex0_1 *** ex0_1 *** ex0_1           `shouldBeSimilar` ex0_3
-    describe "Example 2 with four nodes" $ do
-      it "Second iteration" $
-        ex2_1 *** ex2_1                       `shouldBeSimilar` ex2_2
-      it "Third iteration" $
-        ex2_1 *** ex2_1 *** ex2_1             `shouldBeSimilar` ex2_3
-      it "Fourth iteration" $
-        ex2_1 *** ex2_1 *** ex2_1 *** ex2_1   `shouldBeSimilar` ex2_4
-    describe "Example 2" $ do
-      it "First iteration" $
-        ex2_1 *** ex2_1                       `shouldBeSimilar` ex2_2
-      it "Second iteration" $
-        ex2_1 *** ex2_1 *** ex2_1             `shouldBeSimilar` ex2_3
-      it "Third iteration" $
-        ex2_1 *** ex2_1 *** ex2_1 *** ex2_1   `shouldBeSimilar` ex2_4
-    describe "Example 2 with four nodes" $ do
-      it "First iteration" $
-        ex2_1 *** ex2_1                       `shouldBeSimilar` ex2_2
-      it "Second iteration" $
-        ex2_1 *** ex2_1 *** ex2_1             `shouldBeSimilar` ex2_3
-      it "Third iteration" $
-        (ex2_1 *** ex2_1 *** ex2_1 *** ex2_1) `shouldBeSimilar` ex2_4
-   -}
+  describe "examples" $ do
+    describe "symbolic" $ do
+      examples ("d" :: FreeTTC) nullE unitE
+    {-describe "LatencyDistribution" $ do
+      examples [0, 0.45, 0.45]
+               [0] ([1]::LatencyDistribution IdealizedProbability)-}
 
 ```
 
@@ -303,73 +285,232 @@ infixr 5 ∨
 (∨) = firstToFinish
 (∧) = lastToFinish
 
-ex0_1, ex0_2, ex0_3 :: SMatrix 3 (LatencyDistribution IdealizedProbability)
-ex0_1 =
-      sMatrixFromLists (Proxy :: Proxy 3)
-               [[_0, d,_0]
-               ,[_0,_0, d]
-               ,[_0,_0,_0]
-               ]
-ex0_2 = sMatrixFromLists (Proxy :: Proxy 3)
-               [[_0,_0, d]
-               ,[_0,_0,_0]
-               ,[_0,_0,_0]
-               ]
-ex0_3 = sMatrixFromLists (Proxy :: Proxy 3)
-                [[_0,_0,_0]
-                ,[_0,_0,_0]
-                ,[_0,_0,_0]
-                ]
-
-{-
-ex1_1, ex1_2, ex1_3, ex1_4 :: SMatrix 4 (LatencyDistribution IdealizedProbability)
-ex1_1 =
-  sMatrixFromLists (Proxy :: Proxy 4)
-           [[_0, d, d,_0]
-           ,[_0,_0, d, d]
-           ,[_0,_0,_0, d]
-           ,[_0,_0,_0,_0]
-           ]
-ex1_2 =
-   sMatrixFromLists (Proxy :: Proxy 4)
-            [[_0,d∨(d♢d), d,_0]
-            ,[_0,_0,       d, d]
-            ,[_0,_0,      _0, d]
-            ,[_0,_0,      _0,_0]
-            ]
- -}
-
-
-ex2_1, ex2_2, ex2_3, ex2_4 :: SMatrix 4 (LatencyDistribution IdealizedProbability)
-ex2_1 =
-  sMatrixFromLists (Proxy :: Proxy 4)
-           [[_0, d,_0,_0]
-           ,[_0,_0, d, d]
-           ,[_0,_0,_0, d]
-           ,[_0,_0,_0,_0]
-           ]
-ex2_2 = sMatrixFromLists (Proxy :: Proxy 4)
-                   [[_0,_0,d♢d,d♢d]
-                   ,[_0,_0, d ,d♢d]
-                   ,[_0,_0,_0 , d ]
-                   ,[_0,_0,_0 ,_0 ]
+examples :: (Metric           w
+            ,TimeToCompletion w
+            ,Show             w)
+         => w -> w -> w -> Spec
+examples (d::w) (_0::w) (_1::w)= do
+    describe "directed" $ do
+      describe "1 directed" $ do
+        it "Second iteration" $
+          ex1_1 *** ex1_1                       `shouldBeSimilar` ex1_2
+        it "Third iteration" $
+          ex1_1 *** ex1_1 *** ex1_1             `shouldBeSimilar` ex1_3
+      describe "2" $ do
+        it "Second iteration" $
+          ex2_1 *** ex2_1                       `shouldBeSimilar` ex2_2
+        it "Third iteration" $
+          ex2_1 *** ex2_1 *** ex2_1             `shouldBeSimilar` ex2_3
+      describe "3" $ do
+        it "First iteration" $
+          ex3_1 *** ex3_1                       `shouldBeSimilar` ex3_2
+        it "Second iteration" $
+          ex3_1 *** ex3_1 *** ex3_1             `shouldBeSimilar` ex3_3
+        it "Third iteration" $
+          ex3_1 *** ex3_1 *** ex3_1 *** ex3_1   `shouldBeSimilar` ex3_4
+    describe "directed with self-connectivity" $ do
+      describe "4" $ do
+        it "First iteration" $
+          ex4_1 *** ex4_1                       `shouldBeSimilar` ex4_2
+      describe "5" $ do
+        it "First iteration" $
+          ex5_1 *** ex5_1                         `shouldBeSimilar` ex5_2
+        {-it "Second iteration" $
+          ex5_1 *** ex5_1 *** ex5_1               `shouldBeSimilar` ex5_3-}
+  where
+    (***) :: KnownNat n
+          => SMatrix  n w
+          -> SMatrix  n w
+          -> SMatrix  n w
+    (***)  = sMatMult firstToFinish after
+```
+```dot
+digraph example1{
+  rankdir=LR;
+  graph [nodesep=2];
+  node [shape=plaintext];
+  1 -> 2;
+  2 -> 3;
+}
+```
+```{.literate .haskell}
+    ex1_1, ex1_2, ex1_3 :: SMatrix 3 w
+    ex1_1 =
+          sMatrixFromLists (Proxy :: Proxy 3)
+                   [[_0, d,_0]
+                   ,[_0,_0, d]
+                   ,[_0,_0,_0]
                    ]
-ex2_3 = sMatrixFromLists (Proxy :: Proxy 4)
-                  [[_0,_0,d♢d,d♢d]
-                  ,[_0,_0,  d,d♢d]
-                  ,[_0,_0,_0 ,d   ]
-                  ,[_0,_0,_0 ,_0 ]
-                  ]
-ex2_4 = sMatrixFromLists (Proxy :: Proxy 4)
-                  [[_0,_0,_0,_0]
-                  ,[_0,_0,_0,_0]
-                  ,[_0,_0,_0,_0]
-                  ,[_0,_0,_0,_0]
-                  ]
+    ex1_2 = sMatrixFromLists (Proxy :: Proxy 3)
+                   [[_0,_0, d♢d]
+                   ,[_0,_0,_0]
+                   ,[_0,_0,_0]
+                   ]
+    ex1_3 = sMatrixFromLists (Proxy :: Proxy 3)
+                    [[_0,_0,_0]
+                    ,[_0,_0,_0]
+                    ,[_0,_0,_0]
+                    ]
 
-d :: LatencyDistribution IdealizedProbability
-d  = [0, 0.45, 0.45]
-_0 = [0]
+```
+```dot
+digraph example2 {
+  rankdir=BT;
+  graph [nodesep=2];
+  node [shape=plaintext];
+  subgraph a {
+    2;
+    3;
+    rank=same;
+  }
+  1 -> 2;
+  1 -> 3;
+  2 -> 3;
+  2 -> 4;
+  3 -> 4;
+}
+```
+```{.literate .haskell}
+    ex2_1, ex2_2, ex2_3 :: SMatrix 4 w
+    ex2_1 =
+      sMatrixFromLists (Proxy :: Proxy 4)
+               [[_0, d, d,_0]
+               ,[_0,_0, d, d]
+               ,[_0,_0,_0, d]
+               ,[_0,_0,_0,_0]
+               ]
+    ex2_2 =
+       sMatrixFromLists (Proxy :: Proxy 4)
+                [[_0,_0, d♢d,(d♢d)∨(d♢d)]
+                ,[_0,_0,  _0, d♢d        ]
+                ,[_0,_0,  _0,_0          ]
+                ,[_0,_0,  _0,_0          ]
+                ]
+    ex2_3 =
+       sMatrixFromLists (Proxy :: Proxy 4)
+                [[_0,_0, _0, d♢d♢d]
+                ,[_0,_0, _0, _0]
+                ,[_0,_0, _0, _0]
+                ,[_0,_0, _0, _0]
+                ]
+    ex2_4 =
+       sMatrixFromLists (Proxy :: Proxy 4)
+                [[_0,_0, _0,_0]
+                ,[_0,_0, _0,_0]
+                ,[_0,_0, _0,_0]
+                ,[_0,_0, _0,_0]
+                ]
+```
+```dot
+digraph example3{
+  rankdir=LR;
+  graph [nodesep=2];
+  node [shape=plaintext];
+  1 -> 2;
+  2 -> 3;
+  2 -> 4;
+  3 -> 4;
+}
+```
+```{.literate .haskell}
+    ex3_1, ex3_2, ex3_3, ex3_4 :: SMatrix 4 w
+    ex3_1 =
+      sMatrixFromLists (Proxy :: Proxy 4)
+               [[_0, d,_0,_0]
+               ,[_0,_0, d, d]
+               ,[_0,_0,_0, d]
+               ,[_0,_0,_0,_0]
+               ]
+    ex3_2 = sMatrixFromLists (Proxy :: Proxy 4)
+                       [[_0,_0,d♢d ,d♢d]
+                       ,[_0,_0,_0   ,d♢d]
+                       ,[_0,_0,_0  ,_0 ]
+                       ,[_0,_0,_0  ,_0 ]
+                       ]
+    ex3_3 = sMatrixFromLists (Proxy :: Proxy 4)
+                      [[_0,_0,_0, d♢d♢d]
+                      ,[_0,_0,_0, _0]
+                      ,[_0,_0,_0 ,_0 ]
+                      ,[_0,_0,_0 ,_0 ]
+                      ]
+    ex3_4 = sMatrixFromLists (Proxy :: Proxy 4)
+                      [[_0,_0,_0,_0]
+                      ,[_0,_0,_0,_0]
+                      ,[_0,_0,_0,_0]
+                      ,[_0,_0,_0,_0]
+                      ]
+
+```
+```dot
+digraph Ex4 {
+  rankdir=BT;
+  graph [nodesep=2];
+  node [shape=plaintext];
+  subgraph a {
+    2;
+    3;
+    rank=same;
+  }
+  1 -> 2 -> 3 -> 4;
+  2 -> 4;
+  1 -> 3;
+  1 -> 1;
+  2 -> 2;
+  3 -> 3;
+  4 -> 4;
+}
+```
+```{.literate .haskell}
+    ex4_1, ex4_2 :: SMatrix 4 w
+    ex4_1 =
+      sMatrixFromLists (Proxy :: Proxy 4)
+               [[_1, d, d,_0]
+               ,[_0,_1, d, d]
+               ,[_0,_0,_1, d]
+               ,[_0,_0,_0,_1]
+               ]
+    ex4_2 = sMatrixFromLists (Proxy :: Proxy 4)
+                       [[_1,d∨d,d∨d∨d♢d,d♢d∨d♢d]
+                       ,[_0,_1,d∨d     ,d∨d∨d♢d]
+                       ,[_0,_0,      _1,d∨d     ]
+                       ,[_0,_0,      _0,_1      ]
+                       ]
+```
+```dot
+digraph Ex5 {
+  rankdir=LR;
+  graph [nodesep=2];
+  node [shape=plaintext];
+  1 -> 1;
+  2 -> 2;
+  3 -> 3;
+  4 -> 4;
+  1 -> 2 -> 3 -> 4;
+  2 -> 4;
+}
+```
+```{.literate .haskell}
+    ex5_1, ex5_2 :: SMatrix 4 w
+    ex5_1 =
+     sMatrixFromLists (Proxy :: Proxy 4)
+              [[_1, d,_0,_0]
+              ,[_0,_1, d, d]
+              ,[_0,_0,_1, d]
+              ,[_0,_0,_0,_1]
+              ]
+    ex5_2 = sMatrixFromLists (Proxy :: Proxy 4)
+                      [[_1,d∨d, d♢d,     d♢d]
+                      ,[_0, _1, d∨d ,d∨d∨d♢d]
+                      ,[_0, _0,  _1 ,d∨d     ]
+                      ,[_0, _0,  _0 ,_1      ]
+                      ]
+    {-ex5_3 = sMatrixFromLists (Proxy :: Proxy 4)
+                      [[_1,d∨d∨d,  d♢d∨d♢(d∨d), d♢d∨d♢d∨d♢(d∨d)∨(d∨d)♢(d∨d)    ]
+                      ,[_0,    _1,        d∨d∨d, d∨d∨d∨ d♢d ∨ d♢d ∨ (d∨d)♢(d∨d)]
+                      ,[_0,    _0,            _1, d∨d∨d                             ]
+                      ,[_0,    _0,            _0,              _1                      ]
+                      ]-}
+
 ```
 
 To get specs to work we need a notion of matrix dimension.

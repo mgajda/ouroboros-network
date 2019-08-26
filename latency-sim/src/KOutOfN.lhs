@@ -156,8 +156,8 @@ average :: (ExclusiveSum                a
         => [Series (LatencyDistribution a)]
         ->  Series (LatencyDistribution a)
 average aList =  scaleLD
-             <$> trace ("Scale: " <> show (1/fromIntegral (length aList))
-                      <>" len "   <> show (length aList)) (exSum aList)
+             <$> {-trace ("Scale: " <> show (1/fromIntegral (length aList))
+                      <>" len "   <> show (length aList))-} (exSum aList)
   where
     --scale   :: (Probability a, Show a) => a
     -- scale    =

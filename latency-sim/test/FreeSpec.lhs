@@ -19,6 +19,8 @@ bibliography:
 {-# LANGUAGE TypeApplications    #-}
 module FreeSpec where
 
+import Data.List(sort)
+
 import Data.GenValidity
 import Test.Hspec hiding (after)
 import Test.Hspec.QuickCheck(prop)
@@ -31,6 +33,7 @@ import Test.Validity.Ord
 
 import Free
 import Latency
+import NullUnit
 
 import DelaySpec
 import ProbabilitySpec
@@ -69,28 +72,58 @@ instance GenValid FreeTTC where
 
 ```{.haskell .literate}
 spec = do
+  describe "simplification" $ do
+    it "simplify Alt"    $ simplify (Alt  [Alt  ["a", "b"], "c"]) `shouldBe` Alt  ["a", "b", "c"]
+    it "simplify Mul"    $ simplify (Mul  [Mul  ["a", "b"], "c"]) `shouldBe` Mul  ["a", "b", "c"]
+    it "simplify Conj"   $ simplify (Conj [Conj ["a", "b"], "c"]) `shouldBe` Conj ["a", "b", "c"]
+    it "simplify Alt  1 a" $ simplify (Alt  [unitE, "a"]) `shouldBe` unitE
+    it "simplify Mul  1 a" $ simplify (Mul  [unitE, "a"]) `shouldBe` "a"
+    it "simplify Conj 1 a" $ simplify (Conj [unitE, "a"]) `shouldBe` "a"
+    it "simplify Alt  a 1" $ simplify (Alt  ["a", unitE]) `shouldBe` unitE
+    it "simplify Mul  a 1" $ simplify (Mul  ["a", unitE]) `shouldBe` "a"
+    it "simplify Conj a 1" $ simplify (Conj ["a", unitE]) `shouldBe` "a"
+    it "simplify Alt  0 a" $ simplify (Alt  [nullE, "a"]) `shouldBe` "a"
+    it "simplify Mul  0 a" $ simplify (Mul  [nullE, "a"]) `shouldBe` nullE
+    it "simplify Conj 0 a" $ simplify (Conj [nullE, "a"]) `shouldBe` nullE
+    it "simplify Alt  a 0" $ simplify (Alt  ["a", nullE]) `shouldBe` "a"
+    it "simplify Mul  a 0" $ simplify (Mul  ["a", nullE]) `shouldBe` nullE
+    it "simplify Conj a 0" $ simplify (Conj ["a", nullE]) `shouldBe` nullE
+  describe "sorting" $ do
+    it "a b"   $ sort ["a",     "b"    ] `shouldBe` ["a", "b"         :: FreeTTC]
+    it "b a"   $ sort ["b",     "a"    ] `shouldBe` ["a", "b"         :: FreeTTC]
+    it "a;a a" $ sort [mul "a" "a", "a"] `shouldBe` ["a", mul "a" "a" :: FreeTTC]
   describe "showing TTC" $ do
     describe "simple" $ do
       it "var" $
-        show (Var (TVar 'd')) `shouldBe` "d"
+        showTTC (Var (TVar 'd')) `shouldBe` "d"
       it "const" $
-        show (Keep 1) `shouldBe` "1"
+        showTTC (Keep 1) `shouldBe` "1"
       it "zero" $
-        show (Keep 0) `shouldBe` "0"
+        showTTC (Keep 0) `shouldBe` "0"
+      it "zero" $
+        showTTC nullE `shouldBe` "0"
       it "delay" $
-        show (Wait 1) `shouldBe` "+1t"
-      it "d\\/d" $
-        show (Alt  ["d","d"]) `shouldBe` "d\\/d"
-      it "d/\\d" $
-        show (Conj ["d","d"]) `shouldBe` "d/\\d"
+        showTTC (Wait 1) `shouldBe` "+1t"
+      it "d∨d" $
+        showTTC (Alt  ["d","d"]) `shouldBe` "d∨d"
+      it "d∨0" $
+        showTTC (Alt  ["d",nullE]) `shouldBe` "d"
+      it "d∧d" $
+        showTTC (Conj ["d","d"]) `shouldBe` "d∧d"
+      it "d∧0" $
+        showTTC (Conj  ["d",nullE]) `shouldBe` "0"
       it "d;d" $
-        show (Mul  ["d","d"]) `shouldBe` "d;d"
+        showTTC (Mul  ["d","d"]) `shouldBe` "d;d"
+      it "d;0" $
+        showTTC (simplify (Mul  ["d",nullE])) `shouldBe` "0"
+      it "d;0 ++" $
+        simplify (Mul  ["d",nullE]) `shouldBe` nullE
       it "d;d" $
-        show (Alt  ["d", Mul  ["d","d"]]) `shouldBe` show (Alt  ["d", Mul  ["d","d"]])
+        showTTC (Alt  [Mul  ["d","d"], "d"]) `shouldBe` showTTC (Alt  ["d", Mul  ["d","d"]])
     describe "combos" $ do
       it "altmul" $
-        show (Alt [Mul ["d", "d"], Mul ["d", "d", "d"]])
-          `shouldBe` "d;d\\/d;d;d"
+        showTTC (Alt [Mul ["d", "d"], Mul ["d", "d", "d"]])
+          `shouldBe` "d;d∨d;d;d"
   describe "laws" $ do
     describe "alt" $ do
       prop "commutative" $ commutativeOnValids alt

@@ -80,7 +80,7 @@ tests:
     source-dirs:
       - test
       - sim
-    other-modules: LatencySpec ProbabilitySpec SeriesSpec
+    other-modules: LatencySpec ProbabilitySpec SeriesSpec DelaySpec
     ghc-options:
     - -threaded
     - -rtsopts
