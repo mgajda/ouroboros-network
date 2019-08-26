@@ -3,7 +3,7 @@
 NAME=Latency
 INPUTS=$(cat toc.list)
 FORMAT=markdown+tex_math_dollars+yaml_metadata_block+citations
-OPTS="--filter=pandoc-citeproc --filter=pandoc-hide-codeblocks --bibliography=Latency.bib --from=${FORMAT} --pdf-engine=xelatex --table-of-contents"
+OPTS="--filter=pandoc-filter-graphviz --filter=pandoc-citeproc --filter=pandoc-hide-codeblocks --bibliography=Latency.bib --from=${FORMAT} --pdf-engine=xelatex --table-of-contents"
 #DOCOPTS='--filter=pandoc-hide-codeblocks '
 
 echo "Making hide-codeblocks filter"

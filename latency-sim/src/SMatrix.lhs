@@ -44,7 +44,7 @@ import Unsafe.Coerce(unsafeCoerce)
 This is a simple description of square matrices
 with fixed size ^[Note that we considered using `matrix-static`, but it does not have typesafe indexing.].
 First we need natural indices that are no larger than $n$:
-````{.haskell .literate}
+```{.haskell .literate}
 newtype UpTo (n::Nat) = UpTo { unUpTo :: Natural }
   deriving (Eq, Ord, Num, Typeable)
 
