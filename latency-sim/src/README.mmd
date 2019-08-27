@@ -17,14 +17,20 @@ output:
     toc_depth: 2
     mainfont: "DejaVu Serif"
     sansfont: "Arial"
-    monofont: "Arial"
+    #monofont: "Fira Code"
     latex_engine: xelatex
 toc: true
 toc_depth: 2
 mainfont: "DejaVu Serif"
+#monofont: "Fira Code"
 sansfont: "Arial"
 latex_engine: xelatex
 header-includes: |
+  \usepackage{unicode-math}
+  \usepackage{newunicodechar}
+  \newunicodechar{∨}{\ensuremath{\vee{}}}
+  \newunicodechar{∧}{\ensuremath{\wedge{}}}
+  \newunicodechar{♢}{\ensuremath{\diamond{}}}
   \renewenvironment{verbatim}{%
     \VerbatimEnvironment
     \begin{Verbatim}[breaklines]%
