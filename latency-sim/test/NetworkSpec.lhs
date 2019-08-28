@@ -253,9 +253,9 @@ spec = do
   describe "examples" $ do
     describe "symbolic" $ do
       examples ("d" :: FreeTTC) nullE unitE
-    {-describe "LatencyDistribution" $ do
+    describe "LatencyDistribution" $ do
       examples [0, 0.45, 0.45]
-               [0] ([1]::LatencyDistribution IdealizedProbability)-}
+               [0] ([1]::LatencyDistribution IdealizedProbability)
 
 ```
 
@@ -439,7 +439,6 @@ digraph example3{
                       ,[_0,_0,_0,_0]
                       ,[_0,_0,_0,_0]
                       ]
-
 ```
 ```dot
 digraph Ex4 {

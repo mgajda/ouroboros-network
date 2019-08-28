@@ -25,13 +25,29 @@ bibliography:
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE ViewPatterns        #-}
-module SMatrix where
+module SMatrix(
+    allUpTo
+  , sMatMult
+  , sMatrixFromList
+  , sMatrixFromLists
+  , SMatrix    (..) -- details internal, expose for testing only
+  , SomeSMatrix(..)
+  , (!)
+  , sMakeMinor
+  , sMatrix
+  , (|+|)
+  , intSqrt
+  , rows
+  , columns
+  , size
+  ) where
 
 import Control.Exception(assert)
 import Data.Proxy
 import Data.Typeable
 import GHC.Generics
-import GHC.TypeLits
+import GHC.TypeLits hiding (natVal)
+import GHC.TypeNats(natVal)
 import GHC.Exts(Proxy#)
 import Numeric.Natural
 
@@ -48,14 +64,15 @@ First we need natural indices that are no larger than $n$:
 newtype UpTo (n::Nat) = UpTo { unUpTo :: Natural }
   deriving (Eq, Ord, Num, Typeable)
 
-upTo' :: KnownNat n => Proxy n -> Int -> UpTo n
-upTo' n i | i > fromEnum (natVal n) =
-  error $ "Value " ++ show i
-       ++ " larger than limit of " ++ show (natVal n)
-upTo' n i = UpTo (toEnum i)
 
 upTo :: KnownNat n => Int -> UpTo n
 upTo = upTo' Proxy
+  where
+    upTo' :: KnownNat n => Proxy n -> Int -> UpTo n
+    upTo' n i | i > fromEnum (natVal n) =
+      error $ "Value " ++ show i
+           ++ " larger than limit of " ++ show (natVal n)
+    upTo' n i = UpTo (toEnum i)
 
 instance KnownNat n => Enum (UpTo n) where
   fromEnum (UpTo n) = fromEnum n
@@ -65,13 +82,13 @@ instance KnownNat n => Enum (UpTo n) where
   succ (UpTo a :: UpTo n) = UpTo $ succ a
 
 upToLimit :: KnownNat n => UpTo n -> Natural
-upToLimit (_ :: UpTo n)= toEnum $ fromIntegral $ natVal (Proxy :: Proxy n)
+upToLimit (_ :: UpTo n)= natVal (Proxy :: Proxy n)
 
 allUpTo'  :: KnownNat n => UpTo n -> [UpTo n]
 allUpTo' n = UpTo <$> [1..upToLimit n]
 
 allUpTo :: KnownNat n => [UpTo n]
-allUpTo = allUpTo' undefined
+allUpTo = allUpTo' $ UpTo 0
 
 newtype SMatrix (n::Nat) a = SMatrix { unSMatrix :: DM.Matrix a }
   deriving (Show, Eq, Functor, Applicative
@@ -81,9 +98,6 @@ newtype SMatrix (n::Nat) a = SMatrix { unSMatrix :: DM.Matrix a }
 ```{.haskell .literate}
 size :: KnownNat n => SMatrix n a -> Int
 size (s :: SMatrix n a)= intVal (Proxy :: Proxy n)
-
-sizeProxy :: KnownNat n => SMatrix n a -> Proxy n
-sizeProxy _ = Proxy
 
 intVal :: KnownNat n => Proxy n -> Int
 intVal = fromIntegral . natVal
@@ -96,15 +110,16 @@ sMakeMinor (i,j) (SMatrix m) = SMatrix (DM.minorMatrix (fromEnum i) (fromEnum j)
 
 sFromList :: KnownNat n => Proxy n -> [a] -> SMatrix n a
 sFromList (intVal -> n) aList =
-  assert (length aList == n*n) $
-    SMatrix $
-      DM.fromList n n aList
+  if (length aList == n*n)
+    then
+      SMatrix $
+        DM.fromList n n aList
+    else
+      error $ "Cannot create SMatrix of size " ++ show n
+           ++ " from list of length " ++ show (length aList)
 
 (!) :: KnownNat n => SMatrix n a -> (UpTo n, UpTo n) -> a
 (SMatrix m) ! (i,j) = m DM.! (fromEnum i,fromEnum j)
-
-nrows (size -> n) = n
-ncols (size -> n) = n
 
 sMatrix :: KnownNat n => Proxy n -> ((UpTo n, UpTo n)->a) -> SMatrix n a
 sMatrix (intVal -> n) gen = SMatrix
@@ -162,6 +177,7 @@ a |+| b = (+) <$> a <*> b
 
 Constructing from lists:
 ```{.haskell .literate}
+-- TODO: informative message on length
 sMatrixFromLists :: KnownNat n => Proxy n -> [[a]] -> SMatrix n a
 sMatrixFromLists p ls = sMatrix p genElt
   where
@@ -202,8 +218,6 @@ sMatrixFromList' :: KnownNat n => Proxy n -> [a] -> SMatrix n a
 sMatrixFromList' p@(Proxy :: Proxy n) aList =
   SMatrix $
     DM.fromList (intVal p) (intVal p) aList
---                   (SMatrix :: [a] -> SMatrix n a)
---                  DM.fromList (intVal theNat) (intVal theNat) aList
 sMatrixFromList :: KnownNat n => [a] -> SMatrix n a
 sMatrixFromList  = sMatrixFromList' Proxy
 

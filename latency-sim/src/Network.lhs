@@ -134,7 +134,7 @@ optimalConnections  :: (Probability                     a
                        ,Metric                          a)
                     => SMatrix   n (LatencyDistribution a)
                     -> SMatrix   n (LatencyDistribution a)
-optimalConnections a = converges (fromIntegral $ nrows a) (|*|a) a
+optimalConnections a = converges (fromIntegral $ size a) (|*|a) a
 
 converges ::  Metric r
           =>  Int -- ^ max number of steps
@@ -189,15 +189,10 @@ of distance between any two matrix elements.
 instance (Metric            a
          ,KnownNat        n  )
       =>  Metric (SMatrix n a) where
-  a `distance` b = assert ((n==n') && (m==m'))
-                 $ sqrt
+  a `distance` b = sqrt
                  $ sum [square ((a !(i,k)) `distance` (b ! (i,k)))
                          | i <- allUpTo, k<-allUpTo]
     where
       square x = x*x
-      n  = nrows a
-      m  = ncols a
-      n' = nrows b
-      m' = ncols b
   similarityThreshold = similarityThreshold @a
 ```
