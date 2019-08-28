@@ -40,6 +40,7 @@ library:
     - markdown-unlit
     - pandoc
     - pandoc-citeproc
+    - pandoc-filter-graphviz
 
 # This is a build tool for documentation - a pandoc filter.
 executables:
@@ -75,6 +76,7 @@ tests:
     build-tools:
     - hspec-discover
     - markdown-unlit
+    - pandoc-filter-graphviz
   simulation-test:
     main:                SimulationTest.lhs
     source-dirs:

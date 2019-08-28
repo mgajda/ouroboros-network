@@ -43,6 +43,8 @@ packages:
 
 # Extra package databases containing global packages
 # extra-package-dbs: []
+extra-deps:
+  - pandoc-filter-graphviz-0.1.0.0@sha256:b5a40d4f64a05b69290fff5b4c9ea500ee0309c4808871b0ab8a767489a44471,1170
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true
