@@ -13,7 +13,6 @@ bibliography:
 {-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE RankNTypes                 #-}
@@ -23,15 +22,7 @@ bibliography:
 {-# LANGUAGE ViewPatterns               #-}
 module LatencyEstimates where
 
-import GHC.Exts(IsList(..))
-import Control.Monad(replicateM, liftM2)
-import Data.Function(on)
-import Data.Semigroup
-import qualified Statistics.Distribution as Statistics(ContGen(..))
-import qualified System.Random.MWC as MWC(Gen, withSystemRandom)
-import Test.QuickCheck
-import Test.Hspec(describe, SpecWith)
-import Test.Hspec.QuickCheck(prop)
+import Control.Monad(liftM2)
 
 import Probability
 import Delay
@@ -94,7 +85,8 @@ earliest [0.0]  = Earliest Never
 earliest [_]    = Earliest $ Sometime 0
 earliest (last . unSeries . pdf -> 0.0) =
   error "Canonical LatencyDistribution should always end with non-zero value"
-earliest  other = Earliest . Sometime . Delay . (max 0) . length . takeWhile (0==) . unSeries . pdf $ other
+earliest  other = Earliest . Sometime . Delay . max 0 . length
+                . takeWhile (0==) . unSeries . pdf $ other
 
 onEarliest     = liftBinOp unEarliest Earliest
 

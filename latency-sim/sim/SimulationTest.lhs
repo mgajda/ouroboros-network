@@ -9,7 +9,6 @@ import qualified Statistics.Distribution.Beta          as Statistics
 import qualified Statistics.Distribution.CauchyLorentz as Statistics
 import qualified Statistics.Distribution.Normal        as Statistics
 
-import           Probability
 import           Latency
 import           Simulation
 import           Test.Hspec hiding(after)

@@ -30,7 +30,6 @@ bibliography:
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE UnicodeSyntax     #-}
-{-# LANGUAGE ViewPatterns      #-}
 module Probability(IdealizedProbability(..)
                   ,isValidIdealizedProbability
                   ,ApproximateProbability(..)
@@ -43,7 +42,7 @@ import Data.Data
 import Data.Typeable
 import GHC.Generics
 
-import Data.Ratio((%), Ratio)
+import Data.Ratio(Ratio)
 
 import Metric
 import NullUnit
@@ -66,6 +65,8 @@ class (Complement a
       ,Ord        a
       ,Show       a
       ,Enum       a
+      ,Null       a
+      ,Unit       a
       ) => Probability a where
   isValidProbability :: a -> Bool
 

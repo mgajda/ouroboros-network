@@ -18,7 +18,7 @@ import           Control.Monad.ST
 import           Data.List(sort)
 import           GHC.Exts(IsList(..))
 import qualified Statistics.Distribution             as Statistics
-import qualified System.Random.MWC as MWC(Gen, GenST, withSystemRandom, asGenST)
+import qualified System.Random.MWC as MWC(GenST, withSystemRandom, asGenST)
 
 import           Latency
 import           Probability

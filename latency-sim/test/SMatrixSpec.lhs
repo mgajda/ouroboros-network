@@ -13,17 +13,12 @@ bibliography:
 ```{.haskell .hidden}
 {-# LANGUAGE AllowAmbiguousTypes        #-}
 {-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveFunctor              #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE ExistentialQuantification  #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE PartialTypeSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE UnicodeSyntax              #-}
 module SMatrixSpec where
@@ -63,7 +58,7 @@ data GenSomeSMatrix a =
 
 instance Validity            a
       => Validity (DM.Matrix a) where
-  validate sm = foldMap validate sm
+  validate = foldMap validate
 
 instance (Validity            a
          ,KnownNat          n  )
@@ -161,13 +156,13 @@ smatrixSpec =
 
 spec = do
   describe "Example operations on SMatrices" $ do
-    it "SMatrix of size 1 is just a number" $ do
+    it "SMatrix of size 1 is just a number" $
       numMatrix 1 == numMatrix 1
     prop "Addition of SMatrices of size 1 is just like number addition" $
       \a b -> sumMatrix (numMatrix a |+| numMatrix b) == a+b
     prop "Multiplication of SMatrices of size 1 is just like number multiplication" $
       \a b -> sumMatrix (numMatrix a |*| numMatrix b) == a*b
-    describe "complex numbers as matrices" $ do
+    describe "complex numbers as matrices" $
       prop "multiplication" $ \a (b :: Complex Double) ->
         complexMatrix a |*| complexMatrix b == complexMatrix (a*b)
   --eqSpecOnValid   @(SomeSMatrix Integer)

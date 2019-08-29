@@ -21,4 +21,5 @@ unliterate sim  sim-weeder
 
 stack build
 
-#weeder --build --test
+weeder --build --test
+

@@ -10,21 +10,21 @@ bibliography:
   - Latency.bib
 ---
 ```{.haskell .hidden}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE DeriveTraversable       #-}
+{-# LANGUAGE AllowAmbiguousTypes        #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ExplicitForAll      #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE TypeOperators       #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving  #-}
-{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE ExplicitForAll             #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE MagicHash                  #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE ViewPatterns               #-}
 module SMatrix(
     allUpTo
   , sMatMult
@@ -32,6 +32,7 @@ module SMatrix(
   , sMatrixFromLists
   , SMatrix    (..) -- details internal, expose for testing only
   , SomeSMatrix(..)
+  , someSMatrix
   , (!)
   , sMakeMinor
   , sMatrix
@@ -42,13 +43,11 @@ module SMatrix(
   , size
   ) where
 
-import Control.Exception(assert)
 import Data.Proxy
 import Data.Typeable
 import GHC.Generics
 import GHC.TypeLits hiding (natVal)
 import GHC.TypeNats(natVal)
-import GHC.Exts(Proxy#)
 import Numeric.Natural
 
 import NullUnit
@@ -61,7 +60,7 @@ This is a simple description of square matrices
 with fixed size ^[Note that we considered using `matrix-static`, but it does not have typesafe indexing.].
 First we need natural indices that are no larger than $n$:
 ```{.haskell .literate}
-newtype UpTo (n::Nat) = UpTo { unUpTo :: Natural }
+newtype UpTo (n::Nat) = UpTo { _unUpTo :: Natural }
   deriving (Eq, Ord, Num, Typeable)
 
 
@@ -107,16 +106,6 @@ sMakeMinor ::  KnownNat n
            -> SMatrix  n    a
            -> SMatrix (n-1) a
 sMakeMinor (i,j) (SMatrix m) = SMatrix (DM.minorMatrix (fromEnum i) (fromEnum j) m)
-
-sFromList :: KnownNat n => Proxy n -> [a] -> SMatrix n a
-sFromList (intVal -> n) aList =
-  if (length aList == n*n)
-    then
-      SMatrix $
-        DM.fromList n n aList
-    else
-      error $ "Cannot create SMatrix of size " ++ show n
-           ++ " from list of length " ++ show (length aList)
 
 (!) :: KnownNat n => SMatrix n a -> (UpTo n, UpTo n) -> a
 (SMatrix m) ! (i,j) = m DM.! (fromEnum i,fromEnum j)
@@ -216,8 +205,14 @@ someSMatrix (aList :: [a]) =
 
 sMatrixFromList' :: KnownNat n => Proxy n -> [a] -> SMatrix n a
 sMatrixFromList' p@(Proxy :: Proxy n) aList =
-  SMatrix $
-    DM.fromList (intVal p) (intVal p) aList
+  if length aList == n*n
+    then SMatrix
+       $ DM.fromList n n aList
+    else error $ "Cannot create SMatrix of size " ++ show n
+              ++ " from list of length " ++ show (length aList)
+  where
+    n = intVal p
+
 sMatrixFromList :: KnownNat n => [a] -> SMatrix n a
 sMatrixFromList  = sMatrixFromList' Proxy
 

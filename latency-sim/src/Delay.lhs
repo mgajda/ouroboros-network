@@ -26,12 +26,9 @@ bibliography:
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UnicodeSyntax              #-}
-{-# LANGUAGE ViewPatterns               #-}
 module Delay where
 
 import GHC.Generics
@@ -43,7 +40,7 @@ import Data.Data
 
 <a name="delay">Discrete delays</a> are defined as:
 ```{.haskell .literate}
-newtype Delay = Delay { unDelay :: Int } 
+newtype Delay = Delay { unDelay :: Int }
   deriving (Num, Ord, Eq, Enum, Bounded, Show, Data, Typeable, Generic)
 
 isValidDelay :: Delay -> Bool

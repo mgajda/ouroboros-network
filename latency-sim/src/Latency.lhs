@@ -14,15 +14,12 @@ bibliography:
 {-# LANGUAGE AllowAmbiguousTypes        #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE UnicodeSyntax              #-}
-{-# LANGUAGE ViewPatterns               #-}
 module Latency(
     Delay(..)
   , start
@@ -36,11 +33,6 @@ module Latency(
   ) where
 
 import GHC.Exts(IsList(..))
-import Control.Monad(replicateM)
-import Data.Function(on)
-import Data.Semigroup
-import Data.Validity
-import Test.QuickCheck
 
 import Probability
 import Delay
@@ -226,11 +218,12 @@ firstToFinishLD :: Probability a
                 -> LatencyDistribution a
                 -> LatencyDistribution a
 rd1 `firstToFinishLD` rd2 = fromComplementOfCDF
-                          $ complement (cumsum rd1') .*.
-                            complement (cumsum rd2')
+                          $ complementCDF rd1' .*.
+                            complementCDF rd2'
   where
-    (rd1', rd2') = extendToSameLength 0 (pdf rd1,
-                                         pdf rd2)
+    (rd1',
+     rd2') = extendToSameLengthLD (rd1
+                                  ,rd2)
     -- | Valid only if both lists have the same length
 ```
 Notes:
@@ -271,12 +264,12 @@ Code would look like:
 ```{.haskell .ignore}
 rd1 `firstToFinishLD` rd2 = canonicalizeLD
                           $ LatencyDistribution {
-     pdf      = rd1' .*. complement (cumsum rd2')
-              + rd2' .*. complement (cumsum rd1')
+     pdf      = rd1' .*. complementCDF rd2'
+              + rd2' .*. complementCDF rd1'
               + rd1' .*. rd2'
   }
   where
-    (rd1', rd2') = extendToSameLength 0 (pdf rd1, pdf rd2)
+    (rd1', rd2') = extendToSameLengthLD (rd1, rd2)
     -- | Valid only if both lists have the same length
     complement :: Series Probability -> Series Probability
     complement = fmap (1.0-)
@@ -310,9 +303,9 @@ lastToFinishLD :: Probability a
                -> LatencyDistribution a
                -> LatencyDistribution a
 rd1 `lastToFinishLD` rd2 = fromCDF
-                         $ cumsum rd1' .*. cumsum rd2'
+                         $ cdf rd1' .*. cdf rd2'
   where
-    (rd1', rd2') = extendToSameLength 0 (pdf rd1, pdf rd2)
+    (rd1', rd2') = extendToSameLengthLD (rd1, rd2)
 ```
 
 (Attempt to differentiate these by parts also leads to more complex equation:
@@ -450,7 +443,7 @@ instance IsList (LatencyDistribution a) where
 
 instance Show                      a
       => Show (LatencyDistribution a) where
-  showsPrec _ ld s = "LatencyDistribution "++ showsPrec 0 (fmap show $ unSeries $ pdf ld) s
+  showsPrec _ ld s = "LatencyDistribution "++ showsPrec 9 (fmap show $ unSeries $ pdf ld) s
 ```
 
 To convert possibly improper `LatencyDistribution` into its canonical representation:
@@ -490,4 +483,14 @@ instance Unit a
 instance Null a
       => Null (LatencyDistribution a) where
   nullE = LatencyDistribution (Series [nullE])
+```
+
+```{.haskell .hidden}
+extendToSameLengthLD :: Null a
+                     => (LatencyDistribution a, LatencyDistribution a)
+                     -> (LatencyDistribution a, LatencyDistribution a)
+extendToSameLengthLD (LatencyDistribution ld1, LatencyDistribution ld2) =
+    (LatencyDistribution ld1', LatencyDistribution ld2')
+  where
+    (ld1', ld2') = extendToSameLength nullE (ld1, ld2)
 ```

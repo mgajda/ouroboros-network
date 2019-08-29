@@ -120,7 +120,7 @@ spec = do
         showTTC (simplify (Mul  ["d",nullE])) `shouldBe` "0"
       it "d;d" $
         showTTC (Alt  [Mul  ["d","d"], "d"]) `shouldBe` showTTC (Alt  ["d", Mul  ["d","d"]])
-    describe "combos" $ do
+    describe "combos" $
       it "altmul" $
         showTTC (Alt [Mul ["d", "d"], Mul ["d", "d", "d"]])
           `shouldBe` "d;d∨d;d;d"
@@ -139,4 +139,3 @@ spec = do
     genValidSpec      @FreeTTC
     ordSpecOnValid    @FreeTTC
 ```
-

@@ -14,28 +14,22 @@ bibliography:
 {-# LANGUAGE AllowAmbiguousTypes        #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE UnicodeSyntax              #-}
-{-# LANGUAGE ViewPatterns               #-}
 module KOutOfN where
 
 import GHC.TypeLits(KnownNat)
 import Data.Function(on)
-import Data.Ratio
 
 import Latency
 import Probability
 import Series
 import ShowUtils
 import SMatrix
-
-import Debug.Trace(trace)
 ```
 # Histogramming
 
@@ -156,15 +150,12 @@ average :: (ExclusiveSum                a
         => [Series (LatencyDistribution a)]
         ->  Series (LatencyDistribution a)
 average aList =  scaleLD
-             <$> {-trace ("Scale: " <> show (1/fromIntegral (length aList))
-                      <>" len "   <> show (length aList))-} (exSum aList)
+             <$> exSum aList
   where
-    --scale   :: (Probability a, Show a) => a
-    -- scale    =
     scaleLD :: Probability         a
             => LatencyDistribution a
             -> LatencyDistribution a
-    scaleLD ld = scaleProbability (1/fromIntegral (length aList)) ld
+    scaleLD = scaleProbability (1/fromIntegral (length aList))
 ```
 NOTE:
   _We need to use weighted averaging, if we bias source node selection._

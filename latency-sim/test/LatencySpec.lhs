@@ -33,8 +33,8 @@ import Metric
 import Probability
 import Series
 
-import ProbabilitySpec
-import SeriesSpec
+import ProbabilitySpec()
+import SeriesSpec()
 
 import Test.QuickCheck.Gen(sized, choose)
 import Test.QuickCheck((==>))
@@ -46,7 +46,7 @@ import Test.Validity.Show
 import Test.Validity.Shrinking
 
 import Test.Hspec.QuickCheck(prop)
-import Test.Hspec(describe, it, shouldBe, shouldSatisfy, Spec, SpecWith)
+import Test.Hspec(describe, it, shouldBe, shouldSatisfy, SpecWith)
 import Test.Hspec.Expectations(expectationFailure, Expectation, HasCallStack)
 
 ```
@@ -135,7 +135,6 @@ a `shouldBeSimilar` b =
      then True `shouldBe` True
      else expectationFailure msg
   where
-    dist = a `distance` b
     msg = "Expected: " <> show a <> "\nActual: " <> show b <> "\ndifference is:" <> show (a `distance` b)
 
 infix 3 `shouldBeSimilar`

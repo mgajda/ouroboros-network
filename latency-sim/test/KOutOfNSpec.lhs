@@ -75,8 +75,8 @@ bernoulliSpec probSuccess numTrials =
    Series (bern <$> [0..numTrials])
   where
     bern kSuccesses = fromInteger (numTrials `nOverK` kSuccesses)
-                        * (probSuccess            ^ (fromInteger kSuccesses))
-                        * (complement probSuccess ^ (fromInteger mFailures ))
+                        * (probSuccess            ^ fromInteger kSuccesses)
+                        * (complement probSuccess ^ fromInteger mFailures )
       where
         mFailures = numTrials - kSuccesses
 ```

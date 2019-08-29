@@ -46,23 +46,22 @@ deriving instance CoArbitrary IdealizedProbability
 deriving instance CoArbitrary ApproximateProbability
 
 instance Arbitrary ApproximateProbability where
-  arbitrary = sized $ \aSize -> do
-      let precision = fromIntegral (aSize `max` startingPrecision)
-      denominator <- choose (1, precision  )
-      numerator   <- choose (0, denominator)
-      pure         $ AProb (fromRational (numerator % denominator))
+  arbitrary = AProb <$> arbitraryRatio
     where
       startingPrecision = 5
   shrink (AProb x) = filter isValidApproximateProbability (AProb <$> shrink x)
 
+arbitraryRatio :: Fractional a => Gen a
+arbitraryRatio = sized $ \aSize -> do
+    let precision = fromIntegral (aSize `max` startingPrecision)
+    denominator  <- choose (1, precision  )
+    numerator    <- choose (0, denominator)
+    pure         $ fromRational (numerator % denominator)
+  where
+    startingPrecision = 5
+
 instance Arbitrary IdealizedProbability where
-  arbitrary = sized $ \aSize -> do
-      let precision = fromIntegral (aSize `max` startingPrecision)
-      denominator <- choose (1, precision  )
-      numerator   <- choose (0, denominator)
-      pure         $ IProb (fromRational (numerator % denominator))
-    where
-      startingPrecision = 5
+  arbitrary = IProb <$> arbitraryRatio
   shrink (IProb x) = filter isValidIdealizedProbability
                             (IProb <$> shrink x)
 ```

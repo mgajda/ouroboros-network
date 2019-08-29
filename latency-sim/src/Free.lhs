@@ -17,43 +17,30 @@ bibliography:
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE UnicodeSyntax              #-}
-{-# LANGUAGE ViewPatterns               #-}
 module Free(
     FreeTTC(..)
   , TVar(..)
   , simplify
-  --, simpNeutral
-  --, simpFlatten
   , showTTC
   ) where
 
-import GHC.Exts(IsList(..))
-import Control.Monad(replicateM)
-import Data.Function(on)
 import Data.String
-import Data.List(partition,sort)
-import Data.Maybe
+import Data.List(sort)
 import Data.Ratio
-import Data.Semigroup
 import Data.Typeable
 import GHC.Generics
-import Data.Validity
-import Test.QuickCheck
 import Data.Generics.Uniplate.Data
 import Data.Data
 
 import Probability
 import Delay
 import Latency
-import Series
 import ShowUtils
 import Metric
 import NullUnit
@@ -138,7 +125,7 @@ simpTemplate :: ([FreeTTC] -> FreeTTC)
              -> [FreeTTC]
              ->  FreeTTC
 simpTemplate cons extract args =
-  case fmap concat $ sequenceA $ map extract args of
+  case concat <$> traverse extract args of
     Left  nullElt  -> nullElt
     Right [result] -> result -- eliminate constructor, if only a single result
     Right result   -> cons $ sort result
@@ -173,5 +160,3 @@ instance Null FreeTTC where
 instance Unit FreeTTC where
   unitE = Keep 1
 ```
-
-

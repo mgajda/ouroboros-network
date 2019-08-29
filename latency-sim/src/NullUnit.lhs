@@ -11,7 +11,6 @@ bibliography:
 ---
 ```{.haskell .hidden}
 {-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TypeApplications           #-}
 module NullUnit where
 ```
 ### Nulls and units of multiplication

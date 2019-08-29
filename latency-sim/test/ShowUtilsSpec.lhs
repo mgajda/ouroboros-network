@@ -24,7 +24,7 @@ import ShowUtils
 
 
 ```{.haskell .literate}
-spec = do
+spec =
   describe "showing surfaces" $ do
     it "joinLines" $
       joinLines [("Alpha"++), ("Beta"++), ("Gamma"++)] ""

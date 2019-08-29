@@ -15,21 +15,16 @@ bibliography:
 ```{.haskell .hidden}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeOperators       #-}
 module Network where
 
-import Control.Exception(assert)
 import GHC.TypeNats
 
-import KOutOfN
 import Latency
 import Metric
-import NullUnit
 import Probability
-import Series
 import SMatrix
 ```
 

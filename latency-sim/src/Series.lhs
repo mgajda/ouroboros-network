@@ -19,16 +19,12 @@ bibliography:
 {-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UnicodeSyntax              #-}
-{-# LANGUAGE ViewPatterns               #-}
 module Series where
 
 import GHC.Exts(IsList(..))
-import Data.Foldable
-import Data.Semigroup
 
 import Delay
 import NullUnit
@@ -36,7 +32,6 @@ import Metric
 import Probability(Complement(..))
 
 import Test.QuickCheck
-import Test.QuickCheck.All
 ```
 
 # Appendix: Power series representing distributions
