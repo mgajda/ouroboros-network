@@ -1,0 +1,23 @@
+# Failure models
+
+## Transient failures
+
+Up to now, we used probability distributions and their discretizations
+in order to model _transient failures_:
+
+* congestion leading to dropped packages
+* transmission errors leading to dropped messages
+
+## Persistent failures
+
+In order to deal with _persistent failures_, we would need a notion of failure
+that is not independentent: when we see persistent failure, it is likely that
+we will see it again during retransmissions.
+
+Since persistent failures are likely to continue, we can easily model them
+as a change of network topology: some connection latencies will be
+reset to zero, when persistent failure between two nodes occurs.
+
+We can easily accomodate it as a new layer over our model of the network:
+we will assign probabilities to each link about how often the persistent failure
+occurs, and compute with these in mind.
