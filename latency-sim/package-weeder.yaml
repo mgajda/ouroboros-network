@@ -27,7 +27,7 @@ ghc-options:
 - -fwarn-unused-imports
 
 library:
-  source-dirs: src
+  source-dirs: src-weeder
   dependencies:
     - matrix
     - mwc-random
@@ -59,7 +59,7 @@ executables:
 tests:
   latency-sim-test:
     main:                Main.hs
-    source-dirs:         test
+    source-dirs:         test-weeder
     ghc-options:
     - -threaded
     - -rtsopts
@@ -82,8 +82,8 @@ tests:
   simulation-test:
     main:                SimulationTest.lhs
     source-dirs:
-      - test
-      - sim
+      - test-weeder
+      - sim-weeder
     other-modules: LatencySpec ProbabilitySpec SeriesSpec DelaySpec
     ghc-options:
     - -threaded
