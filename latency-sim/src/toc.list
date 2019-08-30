@@ -3,9 +3,9 @@ Latency.lhs
 LatencyEstimates.lhs
 Simulation.lhs
 ../sim/SimulationTest.lhs
+Network.lhs
 KOutOfN.lhs
 ../test/KOutOfNSpec.lhs
-Network.lhs
 closure.mmd
 Delay.lhs
 ../test/DelaySpec.lhs

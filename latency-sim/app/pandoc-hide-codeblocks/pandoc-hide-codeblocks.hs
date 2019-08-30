@@ -10,10 +10,13 @@ removeHidden :: Block -> Block
 removeHidden cb@(CodeBlock attrs@(_identifier, classes, kvs) str) =
   if "hidden" `elem` classes
      then Null
-     else if "haskell" `notElem` classes
+     else if ("haskell" `notElem` classes) &&
+             (all (`notElem` classes) otherClasses)
             then trace ("Unknown class: " <> show classes <> "\nin block: " <> show cb) cb -- FIXME: ugly imperative debug
             else cb
 removeHidden other                                                = other
+
+otherClasses = ["dot"]
 
 {-
 readDoc s = case readMarkdown def s of
