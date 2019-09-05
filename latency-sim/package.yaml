@@ -10,13 +10,6 @@ extra-source-files:
 - README.md
 - ChangeLog.md
 
-# Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
-
-# To avoid duplicated efforts in documentation and dealing with the
-# complications of embedding Haddock markup inside cabal files, it is
-# common to point users to the README.md file.
 description:         Please see the README on GitHub at <https://github.com/mgajda/latency-sim#readme>
 
 dependencies:
@@ -43,18 +36,7 @@ library:
     - pandoc
     - pandoc-citeproc
     - pandoc-filter-graphviz
-
-# This is a build tool for documentation - a pandoc filter.
-executables:
-  pandoc-hide-codeblocks:
-    main:                pandoc-hide-codeblocks.hs
-    source-dirs:         app/pandoc-hide-codeblocks
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-      - pandoc-types
+    - pandoc-hide-codeblocks
 
 tests:
   latency-sim-test:
@@ -79,6 +61,7 @@ tests:
     - hspec-discover
     - markdown-unlit
     - pandoc-filter-graphviz
+    - pandoc-hide-codeblocks
   simulation-test:
     main:                SimulationTest.lhs
     source-dirs:
@@ -103,4 +86,5 @@ tests:
     build-tools:
     - hspec-discover
     - markdown-unlit
+    - pandoc-hide-codeblocks
 
