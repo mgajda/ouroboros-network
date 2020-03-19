@@ -8,6 +8,7 @@ Network.lhs
 KOutOfN.lhs
 ../test/KOutOfNSpec.lhs
 closure.mmd
+ack.mmd
 Delay.lhs
 ../test/DelaySpec.lhs
 Probability.lhs
