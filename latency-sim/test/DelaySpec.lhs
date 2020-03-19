@@ -37,7 +37,8 @@ instance GenUnchecked Delay where
   genUnchecked = Delay <$> genUnchecked
 
 instance Validity Delay where
-  validate (Delay d) = (d>=0) `check` "delay should be non-negative"
+  validate (Delay d) = (d>=0)
+    `check` "delay should be non-negative"
 
 instance GenValid Delay where
   genValid    = genUnchecked `suchThat` isValid
@@ -55,4 +56,3 @@ spec = do
   genValidSpec      @Delay
   ordSpecOnValid    @Delay
 ```
-

@@ -184,9 +184,10 @@ of distance between any two matrix elements.
 instance (Metric            a
          ,KnownNat        n  )
       =>  Metric (SMatrix n a) where
-  a `distance` b = sqrt
-                 $ sum [square ((a !(i,k)) `distance` (b ! (i,k)))
-                         | i <- allUpTo, k<-allUpTo]
+  a `distance` b =
+      sqrt $
+        sum [square ((a !(i,k)) `distance` (b ! (i,k)))
+               | i <- allUpTo, k<-allUpTo]
     where
       square x = x*x
   similarityThreshold = similarityThreshold @a

@@ -1,5 +1,6 @@
 ```{.haskell .hidden}
-{-# LANGUAGE TypeApplications#-}
+{-# LANGUAGE BlockArguments   #-}
+{-# LANGUAGE TypeApplications #-}
 module Main where
 
 import qualified Statistics.Distribution               as Statistics
@@ -35,7 +36,7 @@ lawsOfTTCForSimulation ::
   -> Simulation
   -> Simulation
   -> Spec
-lawsOfTTCForSimulation l m n =
+lawsOfTTCForSimulation l m n = do
   describe "TimeToCompletion laws on Simulation" $ do
     prop "noDelay is the same as delay 0" $
       noDelay `shouldBeSimilarByDistribution` delay 0
@@ -47,18 +48,24 @@ lawsOfTTCForSimulation l m n =
     prop "delay 0 is neutral" $  (l `after` delay 0)
         `shouldBeSimilarByDistribution`   l
   describe "basic laws of firstToFinish" $ do
-    prop "commutative"        $  (l `firstToFinish` m)
+    prop "commutative"        $
+      (l `firstToFinish` m)
         `shouldBeSimilarByDistribution`  (m `firstToFinish` l)
-    prop "associative"        $ ((l `firstToFinish` m) `firstToFinish` n)
+    prop "associative"        $
+      ((l `firstToFinish` m) `firstToFinish` n)
         `shouldBeSimilarByDistribution`  (l `firstToFinish` (m `firstToFinish` n))
-    prop "delay 0 is neutral" $  (l `firstToFinish` allLost)
+    prop "delay 0 is neutral" $
+      (l `firstToFinish` allLost)
         `shouldBeSimilarByDistribution`   l
   describe "basic laws of firstToFinish" $ do
-    prop "commutative"        $  (l `lastToFinish` m)
+    prop "commutative"        $
+      (l `lastToFinish` m)
         `shouldBeSimilarByDistribution`  (m `lastToFinish` l)
-    prop "associative"        $ ((l `lastToFinish` m) `lastToFinish` n)
+    prop "associative"        $
+      ((l `lastToFinish` m) `lastToFinish` n)
         `shouldBeSimilarByDistribution`  (l `lastToFinish` (m `lastToFinish` n))
-    prop "delay 0 is neutral" $  (l `lastToFinish` delay 0)
+    prop "delay 0 is neutral" $
+      (l `lastToFinish` delay 0)
         `shouldBeSimilarByDistribution`   l
 ```
 Note that this verification is valid only for a particular distribution `d`.

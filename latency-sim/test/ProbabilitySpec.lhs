@@ -16,14 +16,18 @@ import Test.Validity
 
 ```{.haskell .literate}
 instance Validity IdealizedProbability where
-  validate p = check (p>=0) "probability is greater than 0.0"
-            <> check (p<=1) "probability is less than 1.0"
-  --        <> (not $ isInfinite p) `check` "probability must be finite"
-  --        <> (not $ isNaN      p) `check` "probability cannot be NaN"
+  validate p =
+       check (p>=0)
+             "probability is greater than 0.0"
+    <> check (p<=1)
+             "probability is less than 1.0"
 
 instance Validity ApproximateProbability where
-  validate p = check (p>=0)         "probability is greater than 0.0"
-            <> check (p<=1+epsilon) "probability is less than 1.0"
+  validate p =
+       check (p>=0)
+             "probability is greater than 0.0"
+    <> check (p<=1+epsilon)
+             "probability is less than 1.0"
 
 epsilon = 1e-12
 
@@ -43,27 +47,34 @@ instance GenValid ApproximateProbability where
 
 deriving instance CoArbitrary IdealizedProbability
 
-deriving instance CoArbitrary ApproximateProbability
+deriving instance CoArbitrary
+                    ApproximateProbability
 
 instance Arbitrary ApproximateProbability where
   arbitrary = AProb <$> arbitraryRatio
     where
       startingPrecision = 5
-  shrink (AProb x) = filter isValidApproximateProbability (AProb <$> shrink x)
+  shrink (AProb x) =
+    filter isValidApproximateProbability
+           (AProb <$> shrink x)
 
 arbitraryRatio :: Fractional a => Gen a
 arbitraryRatio = sized $ \aSize -> do
-    let precision = fromIntegral (aSize `max` startingPrecision)
+    let precision =
+          fromIntegral
+            (aSize `max` startingPrecision)
     denominator  <- choose (1, precision  )
     numerator    <- choose (0, denominator)
-    pure         $ fromRational (numerator % denominator)
+    pure         $ fromRational (numerator
+                                % denominator)
   where
     startingPrecision = 5
 
 instance Arbitrary IdealizedProbability where
   arbitrary = IProb <$> arbitraryRatio
-  shrink (IProb x) = filter isValidIdealizedProbability
-                            (IProb <$> shrink x)
+  shrink (IProb x) =
+    filter isValidIdealizedProbability
+           (IProb <$> shrink x)
 ```
 
 Test that type class instances are valid:

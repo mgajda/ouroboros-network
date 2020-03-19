@@ -41,7 +41,8 @@ import Data.Data
 <a name="delay">Discrete delays</a> are defined as:
 ```{.haskell .literate}
 newtype Delay = Delay { unDelay :: Int }
-  deriving (Num, Ord, Eq, Enum, Bounded, Show, Data, Typeable, Generic)
+  deriving (Num, Ord, Eq, Enum, Bounded, Show,
+            Data, Typeable, Generic)
 
 isValidDelay :: Delay -> Bool
 isValidDelay (Delay d) = d>=0

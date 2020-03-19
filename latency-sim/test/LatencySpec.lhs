@@ -46,8 +46,10 @@ import Test.Validity.Show
 import Test.Validity.Shrinking
 
 import Test.Hspec.QuickCheck(prop)
-import Test.Hspec(describe, it, shouldBe, shouldSatisfy, SpecWith)
-import Test.Hspec.Expectations(expectationFailure, Expectation, HasCallStack)
+import Test.Hspec(describe, it, shouldBe,
+                  shouldSatisfy, SpecWith)
+import Test.Hspec.Expectations(expectationFailure,
+                        Expectation, HasCallStack)
 
 ```
 
@@ -58,7 +60,9 @@ and is devoid of superfluous trailing zeros beyond first index.
 Indexing starts at 0 (which means: no delay.)
 ```{.haskell .literate}
 -- | Validity criteria for latency distributions
-isValidLD :: Probability a => LatencyDistribution a -> Bool
+isValidLD :: Probability         a
+          => LatencyDistribution a
+          -> Bool
 isValidLD [ ] = False
 ```
 Any distribution with a single-element domain is valid (even if the value is 0.0)
@@ -75,7 +79,8 @@ isValidLD ((1.0<) . sum . pdf -> True) = False
 ```
 Each value must be valid value for probability:
 ```{.haskell .literate}
-isValidLD (pdf -> probs) = all isValidProbability probs
+isValidLD (pdf -> probs) =
+  all isValidProbability probs
 ```
 
 We use QuickCheck [@quickcheck] to generate random distribution for testing:
@@ -85,12 +90,14 @@ instance (Arbitrary                      a
       =>  Arbitrary (LatencyDistribution a) where
   arbitrary = sized $ \maxLen -> do
     actualLen <- choose (0, maxLen-1)
-    ld <- canonicalizeLD . LatencyDistribution . Series <$>
+    ld <- canonicalizeLD . LatencyDistribution
+        . Series <$>
             case actualLen of
               0 -> (:[]) <$> arbitrary
               _ -> -- Last should be non-zero
                    (++) <$> vector actualLen
-                        <*> ((:[]) . getPositive <$> arbitrary)
+                        <*> ((:[]) . getPositive
+                           <$> arbitrary)
     if isValidLD ld
        then pure ld
        else arbitrary
@@ -100,10 +107,18 @@ instance (Arbitrary                      a
            Series              <$>
            recursivelyShrink       ls)
 
-deriving instance Validity     a => Validity     (LatencyDistribution a)
-deriving instance GenValid     a => GenValid     (LatencyDistribution a)
-deriving instance GenUnchecked a => GenUnchecked (LatencyDistribution a)
-deriving instance Typeable     a => Typeable     (LatencyDistribution a)
+deriving instance
+     Validity                          a
+  => Validity (LatencyDistribution     a)
+deriving instance
+     GenValid                          a
+  => GenValid (LatencyDistribution     a)
+deriving instance
+     GenUnchecked                      a
+  => GenUnchecked (LatencyDistribution a)
+deriving instance
+     Typeable                          a
+  => Typeable     (LatencyDistribution a)
 ```
 Equality uses lexicographic comparison, since that allows shortcut evaluation
 by the length of shorter distribution:
@@ -111,14 +126,19 @@ by the length of shorter distribution:
 instance Probability a => Eq (LatencyDistribution a) where
   bs == cs = (lexCompare `on` (unSeries . pdf)) bs cs == EQ
 
-lexCompare :: Probability a => [a] -> [a] -> Ordering
+lexCompare :: Probability a
+           =>            [a]
+           ->            [a]
+           -> Ordering
 lexCompare  xs     []    = if all (==0.0) xs
                            then EQ
                            else LT
-lexCompare  []     xs    = invertComparison $ lexCompare xs []
-lexCompare (x:xs) (y:ys) = case compare x y of
-                          EQ    -> lexCompare xs ys
-                          other -> other
+lexCompare  []     xs    = invertComparison
+                         $ lexCompare xs []
+lexCompare (x:xs) (y:ys) =
+  case compare x y of
+    EQ    -> lexCompare xs ys
+    other -> other
 invertComparison LT = GT
 invertComparison GT = LT
 invertComparison EQ = EQ
@@ -135,7 +155,9 @@ a `shouldBeSimilar` b =
      then True `shouldBe` True
      else expectationFailure msg
   where
-    msg = "Expected: " <> show a <> "\nActual: " <> show b <> "\ndifference is:" <> show (a `distance` b)
+    msg = "Expected: " <> show a <> "\nActual: "
+       <> show b <> "\ndifference is:"
+       <> show (a `distance` b)
 
 infix 3 `shouldBeSimilar`
 ```
@@ -149,27 +171,41 @@ lawsOfTTC :: forall a. (TimeToCompletion a
                        ,Metric           a)
           => SpecWith ()
 lawsOfTTC = do
-  it "noDelay is the same as delay 0" $ (noDelay :: a) `shouldBe` delay 0
+  it "noDelay is the same as delay 0" $
+    (noDelay :: a) `shouldBe` delay 0
   describe "basic laws of convolution" $ do
-    prop "commutative"        $ \l m   ->  l `after` m `shouldBeSimilar` m `after` (l :: a)
-    prop "associative"        $ \l m n -> (l `after` m) `after` (n :: a)
-                                       ~~  l `after` (m `after` n)
-    prop "delay 0 is neutral" $ \l     ->  l `after` delay 0
-                                       ~~ (l :: a)
+    prop "commutative"        $ \l m
+      ->  l `after` m `shouldBeSimilar`
+          m `after` (l :: a)
+    prop "associative"        $ \l m n
+      -> (l `after` m) `after` (n :: a)
+                                       ~~
+          l `after` (m `after` n)
+    prop "delay 0 is neutral" $ \l     ->
+          l `after` delay 0
+                                       ~~
+          (l :: a)
   describe "basic laws of firstToFinish" $ do
-    prop "commutative"        $ \l m   -> l `firstToFinish` m
-                                       ~~ m `firstToFinish` (l :: a)
-    prop "associative"        $ \l m n -> (l `firstToFinish` m) `firstToFinish` (n :: a)
-                                       ~~  l `firstToFinish` (m `firstToFinish` n)
-    prop "delay 0 is neutral" $ \l     ->  l `firstToFinish` allLost
-                                       ~~ (l :: a)
+    prop "commutative"        $ \l m   ->
+         l `firstToFinish` m
+      ~~ m `firstToFinish` (l :: a)
+    prop "associative"        $ \l m n ->
+        (l `firstToFinish` m) `firstToFinish` (n :: a)
+      ~~  l `firstToFinish` (m `firstToFinish` n)
+    prop "delay 0 is neutral" $ \l     ->
+          l `firstToFinish` allLost
+      ~~ (l :: a)
   describe "basic laws of firstToFinish" $ do
-    prop "commutative"        $ \l m   -> l `lastToFinish` m
-                                       ~~ m `lastToFinish` (l :: a)
-    prop "associative"        $ \l m n -> (l `lastToFinish` m) `lastToFinish` (n :: a)
-                                       ~~  l `lastToFinish` (m `lastToFinish` n)
-    prop "delay 0 is neutral" $ \l     ->  l `lastToFinish` delay 0
-                                     ~~ (l :: a)
+    prop "commutative"        $ \l m   ->
+          l `lastToFinish` m
+       ~~ m `lastToFinish` (l :: a)
+    prop "associative"        $ \l m n ->
+         (l `lastToFinish` m) `lastToFinish`
+         (n :: a)
+       ~~  l `lastToFinish` (m `lastToFinish` n)
+    prop "delay 0 is neutral" $ \l     ->
+          l `lastToFinish` delay 0
+       ~~ (l :: a)
 ```
 
 ```{.haskell .literate}

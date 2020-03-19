@@ -54,7 +54,8 @@ import NullUnit
 is defined here for reference:
 ```{.haskell .literate}
 -- | Between 0.0 and 1.0
-newtype IdealizedProbability = IProb { unIProb :: Ratio Integer }
+newtype IdealizedProbability =
+        IProb { unIProb :: Ratio Integer }
   deriving (Num, Fractional, Real, Ord, Eq,
             Data, Typeable, Generic, Enum)
 
@@ -79,10 +80,12 @@ instance Unit IdealizedProbability where
 instance Null IdealizedProbability where
   nullE = 0
 
-isValidIdealizedProbability :: IdealizedProbability -> Bool
+isValidIdealizedProbability ::
+  IdealizedProbability -> Bool
 isValidIdealizedProbability p = p>= 0 && p<=1.0
 
-newtype ApproximateProbability = AProb { unAProb :: Double }
+newtype ApproximateProbability =
+        AProb { unAProb :: Double }
   deriving (Num, Fractional, Real, Ord, Eq,
             Data, Typeable, Generic, Enum)
 
@@ -94,7 +97,8 @@ instance Metric ApproximateProbability where
   similarityThreshold = 0.001
 
 instance Metric IdealizedProbability where
-  IProb a `distance` IProb b = abs $ realToFrac (a-b)
+  IProb a `distance` IProb b = abs $
+                               realToFrac (a-b)
   similarityThreshold = 0 -- no error allowed
 
 instance Unit ApproximateProbability where
@@ -107,9 +111,11 @@ instance Probability IdealizedProbability where
   isValidProbability = isValidIdealizedProbability
 
 instance Probability ApproximateProbability where
-  isValidProbability = isValidApproximateProbability
+  isValidProbability =
+    isValidApproximateProbability
 
-isValidApproximateProbability p = p>=0 && p<=1.0+epsilon
+isValidApproximateProbability p = p>=0
+                               && p<=1.0+epsilon
   where
     epsilon = 1e-12
 ```

@@ -52,39 +52,50 @@ correct:
 ```{.haskell .literate}
 -- Test instance for immediate (undelayed) outcome
 instance TimeToCompletion IdealizedProbability where
-  a `firstToFinish` b = a + b - a * b -- either a or  b happened
-  a `lastToFinish`  b = a * b -- both   a and b happened
-  delay             _ = error "Delay undefined for TimeToCompletion Probability instance"
+  a `firstToFinish` b = a + b - a * b
+  a `lastToFinish`  b = a * b
+  delay             _ = error
+    ( "Delay undefined for TimeToCompletion "
+   <> "Probability instance" )
   allLost             = 0
-  a `after`         b = a * b -- both a and b happened
+  a `after`         b = a * b
 
-instance TimeToCompletion ApproximateProbability where
-  a `firstToFinish` b = a + b - a * b -- either a or  b happened
-  a `lastToFinish`  b = a * b -- both   a and b happened
-  delay             _ = error "Delay undefined for TimeToCompletion Probability instance"
+instance TimeToCompletion
+           ApproximateProbability where
+  a `firstToFinish` b = a + b - a * b
+  a `lastToFinish`  b = a * b
+  delay             _ = error
+     ( "Delay undefined for TimeToCompletion "
+    <> "Probability instance" )
   allLost             = 0
-  a `after`         b = a * b -- both a and b happened
+  a `after`         b = a * b
 
 nOverK :: Integer -> Integer -> Integer
-n `nOverK` k = factorial n `div` factorial k `div` factorial (n-k)
+n `nOverK` k = factorial n `div` factorial k
+                           `div` factorial (n-k)
 
 factorial (n::a) = product ([1..n]::[a])
 
-bernoulliSpec :: IdealizedProbability -> Integer -> Series IdealizedProbability
+bernoulliSpec ::        IdealizedProbability
+   -> Integer -> Series IdealizedProbability
 bernoulliSpec probSuccess numTrials =
    Series (bern <$> [0..numTrials])
   where
-    bern kSuccesses = fromInteger (numTrials `nOverK` kSuccesses)
-                        * (probSuccess            ^ fromInteger kSuccesses)
-                        * (complement probSuccess ^ fromInteger mFailures )
+    bern kSuccesses =
+        fromInteger (numTrials `nOverK` kSuccesses)
+                  * (probSuccess
+                    ^ fromInteger kSuccesses)
+                  * (complement probSuccess
+                    ^ fromInteger mFailures )
       where
         mFailures = numTrials - kSuccesses
 ```
 
 Now we can express it as a QuickCheck property:
 ```{.haskell .literate}
-bernoulliProperty p (Positive n) = kOutOfN (Series (replicate (fromInteger n) p))
-                                == bernoulliSpec p (n::Integer)
+bernoulliProperty p (Positive n) =
+     kOutOfN (Series (replicate (fromInteger n) p))
+  == bernoulliSpec p (n::Integer)
 ```
 
 ```{.haskell .hidden}
@@ -157,18 +168,22 @@ showDim f = show $ maximum $ map ldSize $ toList f
 To generate connection matrix of size $n$:
 ```{.haskell .literate}
 genConnMatrix :: (KnownNat    n
-                 ,Probability a
-                 ,Unit        a
-                 ,Arbitrary   a)
-              => Gen (SMatrix n (LatencyDistribution a))
+                 ,Probability                a
+                 ,Unit                       a
+                 ,Arbitrary                  a)
+              => Gen (SMatrix n
+                        (LatencyDistribution a))
 genConnMatrix =
     sequenceA $ sMatrix Proxy genConnElt
   where
     genConnElt (i, j) | i == j = pure unitE
     genConnElt _               = do
-      l@(LatencyDistribution (Series ser)) <- arbitrary
+      l@(LatencyDistribution (Series ser))
+        <- arbitrary
       case ser of
         [0.0] -> return l -- allow firewalls
-        -- If not a firewall, assure that it has non-zero delay
-        _     -> return $ LatencyDistribution $ Series $ 0.0:ser
+        -- If not a firewall, assure that it
+        -- has non-zero delay
+        _     -> return $ LatencyDistribution
+                        $ Series $ 0.0:ser
 ```

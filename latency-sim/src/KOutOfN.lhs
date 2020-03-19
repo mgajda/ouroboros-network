@@ -97,11 +97,14 @@ kOutOfN :: (TimeToCompletion a
            ,Complement       a
            ) => Series       a
              -> Series       a
-kOutOfN (Series []    ) = error "kOutOfN of empty series"
+kOutOfN (Series []    ) =
+  error "kOutOfN of empty series"
 kOutOfN (Series [x]   ) = [complement x, x]
-kOutOfN (Series (x:xs)) = [x] `convolution` Series xs
+kOutOfN (Series (x:xs)) = [x] `convolution`
+                          Series xs
   where
-    convolution = convolve_ exAdd lastToFinish `on` kOutOfN
+    convolution = convolve_ exAdd lastToFinish
+             `on` kOutOfN
 ```
 ### Fraction of reached nodes
 Now, for a connection matrix $A$, each row corresponds to a vector
@@ -120,10 +123,11 @@ nodesReached  = kOutOfN
 ```
 For this we need to define `complement` for `LatencyDistribution`:
 ```{.haskell .literate}
-instance Complement a
+instance Complement                      a
       => Complement (LatencyDistribution a) where
-  complement (LatencyDistribution s) = LatencyDistribution
-                                     ( complement <$> s )
+  complement (LatencyDistribution s) =
+    LatencyDistribution
+      ( complement <$> s )
 ```
 
 ## Averaging broadcast from different nodes
@@ -137,12 +141,13 @@ elements by the number of distributions summed:
 
 ```{.haskell .literate}
 averageKOutOfN  :: (KnownNat     n
-                   ,Probability  a
-                   ,ExclusiveSum a
-                   ,Show         a)
+                   ,ExclusiveSum                  a
+                   ,Probability                   a
+                   ,Show                          a)
                 => SMatrix n (LatencyDistribution a)
                 -> Series    (LatencyDistribution a)
-averageKOutOfN m = average (nodesReached . Series <$> rows m)
+averageKOutOfN m = average
+  (nodesReached . Series <$> rows m)
 
 average :: (ExclusiveSum                a
            ,Probability                 a
@@ -155,7 +160,8 @@ average aList =  scaleLD
     scaleLD :: Probability         a
             => LatencyDistribution a
             -> LatencyDistribution a
-    scaleLD = scaleProbability (1/fromIntegral (length aList))
+    scaleLD = scaleProbability
+             (1/fromIntegral (length aList))
 ```
 NOTE:
   _We need to use weighted averaging, if we bias source node selection._

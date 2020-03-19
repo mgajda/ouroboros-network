@@ -42,7 +42,8 @@ but use use finite series and shortcut evaluation:
 ```{.haskell .literate}
 -- | Series contain the same information as lists.
 newtype Series a = Series { unSeries :: [a] }
-  deriving (Eq, Show, Read, Functor, Foldable, Applicative, Semigroup)
+  deriving (Eq, Show, Read, Functor, Foldable,
+            Applicative, Semigroup)
 ```
 Generating function of :
 $$ F(t)=f_0*t^0+f_1*t^1+f_2*t^2+...+f_n*t^n $$
@@ -51,11 +52,11 @@ is represented by the Haskell data structure:
 f_t = Series [a0, a1, .., an]
 ```
 
+Cumulative sums computes sums of 1..n-th term of the series:
 ```{.haskell .literate}
--- | Cumulative sums computes sums of 1..n-th term of the series
 cumsum :: Num a => Series a -> Series a
 cumsum = Series
-       . tail -- drop uninformative zero at the beginning of result
+       . tail
        . scanl (+) 0
        . unSeries
 ```
@@ -72,27 +73,35 @@ It is _backward finite difference operator_, as defined by @wiki:backwardFiniteD
 ```{.haskell .literate}
 diffEnc :: Num a => Series a -> Series a
 diffEnc (Series []) = Series []
-diffEnc (Series s ) = Series $ head s : zipWith (-) (tail s) s
+diffEnc (Series s ) =
+  Series $ head s
+         : zipWith (-) (tail s) s
 ```
 
 This serves to get cumulants:
 ```{.haskell .literate .ignored}
-test_simpleCumsum  = cumsum [1,1,1] == ([1,2,3] :: Series Int)
-test_simpleCumsum2 = cumsum [1,2,3] == ([1,3,6] :: Series Int)
-test_cumsumIsLeftAdjointOfDiffEnc  x = cumsum  (diffEnc x) == x
-test_cumsumIsRightAdjointOfDiffEnc x = diffEnc (cumsum  x) == x
+test_simpleCumsum  = cumsum [1,1,1]
+                  == ([1,2,3] :: Series Int)
+test_simpleCumsum2 = cumsum [1,2,3]
+                  == ([1,3,6] :: Series Int)
+test_cumsumIsLeftAdjointOfDiffEnc  x =
+  cumsum  (diffEnc x) == x
+test_cumsumIsRightAdjointOfDiffEnc x =
+  diffEnc (cumsum  x) == x
 ```
 So that `diffEnc` of CDF will get PDF,
 and `cumsum` of PDF will get CDF.
+
+Subtractive remainders computes running remainders to 1.0 after summing up
+all terms of the series up to a given position.
+This is convenience in case we decide to switch to continued fractions.
 ```{.haskell .hidden}
--- | Subtractive remainders computes running remainders to 1.0 after summing up
---   all terms of the series up to a given position.
---   This is convenience in case we decide to switch to continued fractions.
 subrem :: Num a => Series a -> Series a
 subrem = Series . scanl (-) 1 . unSeries
 ```
+
+Cut series at a given index.
 ```{.haskell .literate}
--- | Cut series at a given index.
 cut :: Delay -> Series a -> Series a
 cut (Delay t) (Series s) = Series (take t s)
 
@@ -100,11 +109,14 @@ instance IsList (Series a) where
   type Item (Series a) = a
   fromList          = Series
   toList (Series s) = s
-
--- | Scalar multiplication
+```
+Scalar multiplication:
+```{.haskell .literate}
 infixl 7 .* -- same precedence as *
 (.*):: Num a => a -> Series a -> Series a
-c .* (Series (f:fs)) = Series (c*f : unSeries ( c.* Series fs))
+c .* (Series (f:fs)) =
+      Series (c*f
+             :unSeries ( c.* Series fs))
 _ .* (Series []    ) = Series []
 ```
 $$ F(t)=f_0*t^0+f_1*t^1+f_2*t^2+...+f_n*t^n $$
@@ -133,17 +145,26 @@ $$F(t)⊛G(t)=Σ_{\tau{}=0}^t x^t*f(\tau)*g(t-
 ```{.haskell .literate}
 infixl 7 `convolve` -- like multiplication
 -- | Convolution in style of McIlroy
-convolve :: Num a => Series a -> Series a -> Series a
-Series (f:fs) `convolve` gg@(Series (g:gs)) =
+convolve :: Num    a
+         => Series a
+         -> Series a
+         -> Series a
+Series            (f:fs)
+  `convolve`
+       gg@(Series (g:gs)) =
   Series
     (f*g :
       unSeries (f .* Series gs +
                (Series fs `convolve` gg)))
-Series []     `convolve` _                  = Series []
-_             `convolve` Series []          = Series []
-
--- | Elementwise multiplication, assuming missing terms are zero.
-(.*.) :: Num a => Series a -> Series a -> Series a
+Series []     `convolve` _         = Series []
+_             `convolve` Series [] = Series []
+```
+Elementwise multiplication, assuming missing terms are zero.
+```{.haskell .literate}
+(.*.) :: Num    a
+      => Series a
+      -> Series a
+      -> Series a
 Series a .*. Series b = Series (zipWith (*) a b)
 ```
 Since we use finite series, we need to extend their length
@@ -152,14 +173,17 @@ when operation is done on series of different length.
 Note that for emphasis, we also allow convolution with arbitrary addition
 and multiplication:
 ```{.haskell .literate}
-convolve_ :: (a -> a -> a)
-          -> (a -> a -> a)
+convolve_ :: (      a ->        a ->        a)
+          -> (      a ->        a ->        a)
           -> Series a -> Series a -> Series a
 convolve_ (+) (*) (Series (f:fs)) gg@(Series (g:gs)) =
   Series
     (f * g :
-      zipWithExpanding (+) (f .* gs)
-                           (unSeries (convolve_ (+) (*) (Series fs) gg)))
+      zipWithExpanding
+        (+)
+        (f .* gs)
+        (unSeries (convolve_ (+) (*)
+                             (Series fs) gg)))
   where
     a .* bs = (a*) <$> bs
 convolve_ _ _ (Series [])  _          = Series []
@@ -168,8 +192,10 @@ convolve_ _ _  _          (Series []) = Series []
 ```
 We need a variant of `zipWith` that assumes that shorter list is expanded
 with unit of the operation given as argument:
-```{.haskell .literate
-zipWithExpanding :: (a -> a -> a) -> [a] -> [a] -> [a]
+
+```{.haskell .literate}
+zipWithExpanding :: (a  ->  a  ->  a)
+                 -> [a] -> [a] -> [a]
 zipWithExpanding f = go
   where
     go    []     ys  = ys -- unit `f` y    == y
@@ -180,9 +206,11 @@ zipWithExpanding f = go
 
 Here we use extension by a given element `e`, which is 0 for normal series,
 or 1 for complement series.
+
+Extend both series to the same length with placeholder zeros.
+Needed for safe use of complement-based operations.
+
 ```{.haskell .literate}
--- | Extend both series to the same length with placeholder zeros.
---   Needed for safe use of complement-based operations.
 extendToSameLength e (Series a, Series b) = (Series resultA, Series resultB)
   where
     (resultA, resultB) = go a b
@@ -198,8 +226,9 @@ extendToSameLength e (Series a, Series b) = (Series resultA, Series resultB)
         ~(bs', _  ) = go [] cs
 ```
 In a rare case (CDFs) we might also prolong by the length of the last entry:
+
+Extend both series to the same length with placeholder of last element.
 ```{.literate .haskell}
--- | Extend both series to the same length with placeholder of last element.
 extendToSameLength' (Series a, Series b) = (Series resultA, Series resultB)
   where
     (resultA, resultB) = go a b
@@ -221,7 +250,8 @@ series and instead choose length of approximation when computing them._
 Now we can present an instance of number class for `Series`:
 ```{.haskell .literate}
 instance Num a => Num (Series a) where
-  Series a + Series b = Series (zipWithExpanding (+) a b)
+  Series a + Series b = Series
+    (zipWithExpanding (+) a b)
   (*)         = convolve
   abs         = fmap abs
   signum      = fmap signum
@@ -232,9 +262,9 @@ Note that we do not know yet how to define `fromInteger` function.
 Certainly we would like to define null and unit (neutral element) of convolution,
 but it is not clear what to do about the others:
 ```{.haskell .literate}
-seriesFromInteger other = error
-                        $ "Do not use fromInteger "
-                       <> show other <> " to get Series!"
+seriesFromInteger other =
+  error $ "Do not use fromInteger "
+       <> show other <> " to get Series!"
 ```
 Given a *unit* and *null* elements, we can give unit and null element of
 a `Series`. ^[Note that we in this context we are mainly interested in null

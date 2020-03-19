@@ -1,17 +1,14 @@
 ### Performance goals
 
-The *optimal network* performance can be reached for
-an active connection network that contains shortest path
-between each two nodes.
-We aim for a performance within fixed factor of this
-*optimal network*.
+We should how to use few lines of Haskell code
+to accurately model network latency distributions
+and get n-hop approximations of packet
+propagation.
 
-_Note that optimal network is almost never just
-optimal spanning tree_
-We also want to set a reasonable *stabilization time bounds*
-before this performance goal is reached.
+It turns out to be a good exercise, supported
+by the power series approach of McIlroy.
 
-### Relation to other plausible metrics
+### Relation of latency to other plausible metrics
 
 One can imagine other key properties that network must satisfy:
 
