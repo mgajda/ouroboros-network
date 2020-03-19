@@ -30,9 +30,15 @@ We need to check that `sampleSimulation` is a functor with respect to `TimeToCom
 shouldBeSimilarByDistribution :: Simulation -> Simulation -> Property
 a `shouldBeSimilarByDistribution` b = ioProperty $ a `similarByDistribution` b
 
-lawsOfTTCForSimulation :: Simulation -> Simulation -> Simulation -> Spec
-lawsOfTTCForSimulation l m n = describe "TimeToCompletion laws on Simulation" $ do
-  prop "noDelay is the same as delay 0" $ noDelay `shouldBeSimilarByDistribution` delay 0
+lawsOfTTCForSimulation ::
+     Simulation
+  -> Simulation
+  -> Simulation
+  -> Spec
+lawsOfTTCForSimulation l m n =
+  describe "TimeToCompletion laws on Simulation" $ do
+    prop "noDelay is the same as delay 0" $
+      noDelay `shouldBeSimilarByDistribution` delay 0
   describe "basic laws of convolution" $ do
     prop "commutative"        $        (l `after` m)
        `shouldBeSimilarByDistribution` (m `after` l)

@@ -37,16 +37,20 @@ over basic operations from `TimeToCompletion` class.
 
 * Upper bound on distribution is the `Latest` possible time^[Here `liftBinOp` is for lifting an operator to a newtype.]:
 ```{.haskell .literate}
-newtype Latest = Latest { unLatest :: SometimeOrNever }
+newtype Latest =
+        Latest { unLatest :: SometimeOrNever }
   deriving (Eq, Ord, Show)
 
-newtype SometimeOrNever = SometimeOrNever { unSometimeOrNever :: Maybe Delay }
+newtype SometimeOrNever =
+        SometimeOrNever
+          { unSometimeOrNever :: Maybe Delay }
   deriving (Eq)
 
 instance Show SometimeOrNever where
   showsPrec _     Never       = ("Never"++)
-  showsPrec prec (Sometime t) =  showParen (prec>app_prec)
-                              $ ("Sometime "++) . showsPrec (app_prec+1) t
+  showsPrec prec (Sometime t) =
+      showParen (prec>app_prec) $
+        ("Sometime "++) . showsPrec (app_prec+1) t
     where
       app_prec = 10
 
@@ -59,42 +63,57 @@ instance Ord SometimeOrNever where
   Sometime _ `compare` Never      = LT
   Sometime t `compare` Sometime u = t `compare` u
 
-latest :: Probability a => LatencyDistribution a -> Latest
+latest :: Probability         a
+       => LatencyDistribution a
+       -> Latest
 latest ((<1.0) . sum . pdf -> True  ) = Latest Never
 latest (last . unSeries . pdf -> 0.0) =
-  error "Canonical LatencyDistribution should always end with non-zero value"
-latest  x                             = Latest . Sometime . Delay . (-1+)
-                                      . length . unSeries . pdf $ x
+  error ("Canonical LatencyDistribution "
+     <>  "should always end with non-zero value")
+latest  x                             =
+    Latest . Sometime . Delay . (-1+)
+  . length . unSeries . pdf $ x
 
 onLatest = liftBinOp unLatest Latest
 
 instance TimeToCompletion Latest where
   firstToFinish = onLatest min
   lastToFinish  = onLatest max
-  after         = liftBinOp (unSometimeOrNever . unLatest)
-                            (Latest . SometimeOrNever) (liftM2 (+))
+  after         =
+    liftBinOp (unSometimeOrNever . unLatest)
+              (Latest . SometimeOrNever)
+              (liftM2 (+))
   delay         = Latest . Sometime
   allLost       = Latest   Never
 ```
 * Lower bound on distribution is the `Earliest` possible time:
 ```{.haskell .literate}
-newtype Earliest = Earliest { unEarliest :: SometimeOrNever }
+newtype Earliest =
+        Earliest
+          { unEarliest :: SometimeOrNever }
   deriving (Eq, Ord, Show)
-earliest :: Probability a => LatencyDistribution a -> Earliest
+earliest :: Probability         a
+         => LatencyDistribution a
+         -> Earliest
 earliest [0.0]  = Earliest Never
 earliest [_]    = Earliest $ Sometime 0
 earliest (last . unSeries . pdf -> 0.0) =
-  error "Canonical LatencyDistribution should always end with non-zero value"
-earliest  other = Earliest . Sometime . Delay . max 0 . length
-                . takeWhile (0==) . unSeries . pdf $ other
+  error ("Canonical LatencyDistribution "
+     <>  "should always end with non-zero value")
+earliest  other = Earliest . Sometime
+                . Delay . max 0 . length
+                . takeWhile (0==) . unSeries
+                . pdf $ other
 
 onEarliest     = liftBinOp unEarliest Earliest
 
 instance TimeToCompletion Earliest where
   firstToFinish = onEarliest min
   lastToFinish  = onEarliest max
-  after         = liftBinOp (unSometimeOrNever . unEarliest)
-                            (Earliest . SometimeOrNever) (liftM2 (+))
+  after         =
+    liftBinOp (unSometimeOrNever . unEarliest)
+              (Earliest . SometimeOrNever)
+              (liftM2 (+))
   delay         = Earliest . Sometime
   allLost       = Earliest Never
 ```

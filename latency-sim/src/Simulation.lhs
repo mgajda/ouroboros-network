@@ -48,14 +48,18 @@ instance TimeToCompletion Simulation where
   firstToFinish = onSimulation min
   lastToFinish  = onSimulation max
   after         = onSimulation (+)
-  delay       t = Simulation $ const $ return t
-  allLost       = Simulation $ const $ return maxBound
+  delay       t = Simulation $ const
+                $ return t
+  allLost       = Simulation $ const
+                $ return maxBound
 
-onSimulation :: (Delay      -> Delay      -> Delay)
-             ->  Simulation -> Simulation -> Simulation
+onSimulation ::
+     (Delay      -> Delay      -> Delay)
+  ->  Simulation -> Simulation -> Simulation
 
-onSimulation op a b = Simulation $ \st -> op <$> unSimulation a st
-                                             <*> unSimulation b st
+onSimulation op a b =
+  Simulation $ \st -> op <$> unSimulation a st
+                         <*> unSimulation b st
 ```
 Key part is generating a process of length with a given random distribution:
 ```{.haskell .literate}
@@ -66,7 +70,8 @@ instance Stochastic Simulation where
       sim st = roundDelay <$> Statistics.genContVar d st
         where
           roundDelay :: Double -> Delay
-          roundDelay = Delay . fromEnum . toInteger . ceiling
+          roundDelay = Delay . fromEnum
+                     . toInteger . ceiling
 ```
 
 Correctness of simulation lies on the assumption that we
@@ -79,15 +84,18 @@ or addition of times for sequential composition.
 We need to sample `Simulation` a number of times to get a histogram.
 ```{.haskell .literate}
 sampleSimulation' :: Probability a
-                  => Int -> Simulation -> IO (LatencyDistribution a)
-sampleSimulation' numSamples (Simulation s) = histogram <$>
-    (MWC.withSystemRandom . MWC.asGenST $ sampler)
+                  => Int -> Simulation
+                  -> IO (LatencyDistribution a)
+sampleSimulation' numSamples (Simulation s) =
+    histogram <$>
+      (MWC.withSystemRandom . MWC.asGenST $ sampler)
   where
     sampler :: forall s. MWC.GenST s -> ST s [Delay]
     sampler st = replicateM numSamples $ s st
 
-sampleSimulation :: Simulation
-                 -> IO (LatencyDistribution ApproximateProbability)
+sampleSimulation ::
+     Simulation
+  -> IO (LatencyDistribution ApproximateProbability)
 sampleSimulation  = sampleSimulation' 10000
 ```
 To build the histogram, we sort and count delays from the list of samples:
@@ -99,15 +107,17 @@ histogram = fromList . scale . go (0, 0) . sort
   where
     scale l = fmap (/sum l) l
     go (height, 0            ) []     = []
-    go (_,      positiveCount) []     = [positiveCount]
+    go (_,      positiveCount) []     =
+      [positiveCount]
     go (height, count        ) (d:ds) =
       if height == d
-         then   go (height, count+1) ds
+         then    go (height, count+1) ds
          else -- d>height
-              count:go (height+1, 0) (d:ds)
+           count:go (height+1, 0) (d:ds)
 ```
 Now we can compare simulations too:
 ```{.haskell .literate}
-s `similarByDistribution` t = (~~) <$> sampleSimulation s
-                                   <*> sampleSimulation t
+s `similarByDistribution` t =
+  (~~) <$> sampleSimulation s
+       <*> sampleSimulation t
 ```

@@ -6,6 +6,7 @@ output:
     toc: true
     toc_depth: 2
     latex_engine: xelatex
+    listings: true
 bibliography:
   - Latency.bib
 ---
@@ -52,9 +53,9 @@ of time:
 
 <center>
 
-![Completion rate against deadline](../doc/completion-rate.png "Completion rate against deadline"){.center} \
+![Completion rate against deadline](../doc/completion-rate.png "Completion rate against deadline"){ width=50% height=25%}
 
-![Latency distribution](../doc/latency-distribution.png "Latency distribution"){.center}\
+![Latency distribution](../doc/latency-distribution.png "Latency distribution"){ width=50% height=25% }
 
 </center>
 
@@ -84,20 +85,22 @@ $\mathcal{Q}=(\mathcal{T}\rightarrow{}\mathcal{A})$.
 Below is Haskell specification of this datatype:
 ```{.haskell .literate}
 newtype LatencyDistribution a =
-  LatencyDistribution {
-    pdf :: Series a
-  }
+  LatencyDistribution { pdf :: Series a }
 ```
 The representation above holds PDF (probability density function).
 Its cumulative distribution function can be trivially computed with running sum:
 ```{.haskell .literate}
-cdf :: Num a => LatencyDistribution a -> Series a
+cdf :: Num                 a
+    => LatencyDistribution a
+    -> Series              a
 cdf = cumsum . pdf
 ```
 
 Since it is common use complement of CDF, we can have accessor for this one too:
 ```{.haskell .literate}
-complementCDF :: Probability a => LatencyDistribution a -> Series a
+complementCDF :: Probability         a
+              => LatencyDistribution a
+              -> Series              a
 complementCDF  = complement . cumsum . pdf
 ```
 
@@ -105,7 +108,9 @@ Since we use `canonicalizeLD` to make sure that every distribution is kept
 in canonical form, we might also want to make constructors that create `LatencyDistribution`
 from a series that represents PDF or CDF:
 ```{.haskell .literate}
-fromPDF :: Probability a => Series a -> LatencyDistribution a
+fromPDF :: Probability         a
+        => Series              a
+        -> LatencyDistribution a
 fromPDF = canonicalizeLD . LatencyDistribution
 ```
 
@@ -113,16 +118,21 @@ To create LatencyDistribution from CDF we need `diffEnc`
 (_differential encoding_ or _backward finite difference operator_
  from [`Series` module](#series)):
 ```{.haskell .literate}
-fromCDF :: Probability a
-        => Series a
+fromCDF :: Probability         a
+        => Series              a
         -> LatencyDistribution a
-fromCDF = canonicalizeLD . LatencyDistribution . diffEnc
+fromCDF = canonicalizeLD . LatencyDistribution
+        . diffEnc
 ```
 Similar we can create `LatencyDistribution` from complement of CDF:
 ```{.haskell .literate}
-fromComplementOfCDF :: Probability a
-                    => Series a -> LatencyDistribution a
-fromComplementOfCDF  = canonicalizeLD . LatencyDistribution . diffEnc . complement
+fromComplementOfCDF :: Probability         a
+                    => Series              a
+                    -> LatencyDistribution a
+fromComplementOfCDF  = canonicalizeLD
+                     . LatencyDistribution
+                     . diffEnc
+                     . complement
 ```
 
 For ease of implementation, we express each function as a series of values
@@ -181,7 +191,8 @@ afterLD :: Probability a
         => LatencyDistribution a
         -> LatencyDistribution a
         -> LatencyDistribution a
-rd1 `afterLD` rd2 = fromPDF $ pdf rd1 `convolve` pdf rd2
+rd1 `afterLD` rd2 = fromPDF
+                  $ pdf rd1 `convolve` pdf rd2
 ```
 
 2. Alternative selection ∨: given $ΔQ_1(t)$ and $ΔQ_2(t)$ of two different
@@ -217,15 +228,16 @@ firstToFinishLD :: Probability a
                 => LatencyDistribution a
                 -> LatencyDistribution a
                 -> LatencyDistribution a
-rd1 `firstToFinishLD` rd2 = fromComplementOfCDF
-                          $ complementCDF rd1' .*.
-                            complementCDF rd2'
+rd1 `firstToFinishLD` rd2 =
+    fromComplementOfCDF   $
+      complementCDF rd1' .*.
+      complementCDF rd2'
   where
     (rd1',
      rd2') = extendToSameLengthLD (rd1
                                   ,rd2)
-    -- | Valid only if both lists have the same length
 ```
+
 Notes:
 
 1. Since we model this with finite discrete series, we first need to extend them
@@ -237,21 +249,7 @@ $$ \begin{array}{lcr} P_a(x≤t) & = & Σ_{x=0}^{t}P_a(x) \\
 ∇\left(Σ_0^{t}P_{a}(x)dx\right) & = & P_a(t) \\
 \end{array}$$
 In continuous domain, one can also differentiate both sides of the equation above
-to check if we can save computations by computing PDF directly:
-
-$$
-\begin{array}{rcl} ∇\left(Σ_{x=0}^{t}P_{min(a,b)}(x)dx\right) & = & ∇\left(1-(1-Σ_{x=0}^{t}P_a(x)dx)*(1-Σ_{x=0}^tP_b(x)dx)\right) \\
- P_{min(a,b)}(t) & = & ∇\left(1-(1-Σ_{x=0}^{t}P_a(x))*(1-Σ_{x=0}^tP_b(x))\right) \\
- & = & ∇\left(1-1+(Σ_{x=0}^{t}P_a(x))+(Σ_{x=0}^tP_b(x))-(Σ_{x=0}^{t}P_a(x)*Σ_{x=0}^tP_b(x))\right) \\
- & = & ∇\left(Σ_{x=0}^{t}P_a(x))'+(Σ_{x=0}^tP_b(x))'-(Σ_{x=0}^{t}P_a(x)dx*Σ_{x=0}^tP_b(x)\right) \\
- & = & P_a(t)+P_b(t)-∇\left(Σ_{x=0}^{t}P_a(x)*Σ_{x=0}^tP_b(x)\right) \\
- & = & P_a(t)+P_b(t)-∇\left(Σ_{x=0}^{t}P_a(x)\right)*Σ_{x=0}^tP_b(x) \; + \\
- & - & Σ_{x=0}^{t}P_a(x)*∇\left(Σ_{x=0}^tP_b(x)\right)+P_a(x)*P_b(x) \\
- & = & P_a(x)+P_b(x)-P_a(x)*Σ_{x=0}^tP_b(x) -Σ_{x=0}^{t}P_a(x)dx*P_b(x) \\
- & + & P_a(t)*P_b(t) \\
- & = & P_a(x)\left(1-Σ_{x=0}^tP_b(x))\right)+P_b(x)\left(1-Σ_{x=0}^{t}P_a(x)\right) + P_a(t)*P_b(t) \\
- \end{array}
-$$
+to check if we can save computations by computing PDF directly.
 
 Unfortunately, that means that instead of 2x cumulative sum operations,
 1x elementwise multiplication, and 1x differential encoding operation,
@@ -260,32 +258,35 @@ and 3x pointwise multiplications, and two complements.
 
 So we get an equation that is less obviously correct,
 and more computationally expensive.
+
 Code would look like:
 ```{.haskell .ignore}
-rd1 `firstToFinishLD` rd2 = canonicalizeLD
-                          $ LatencyDistribution {
+rd1 `firstToFinishLD` rd2 = canonicalizeLD $
+  LatencyDistribution {
      pdf      = rd1' .*. complementCDF rd2'
               + rd2' .*. complementCDF rd1'
-              + rd1' .*. rd2'
-  }
+              + rd1' .*. rd2'              }
   where
     (rd1', rd2') = extendToSameLengthLD (rd1, rd2)
-    -- | Valid only if both lists have the same length
     complement :: Series Probability -> Series Probability
     complement = fmap (1.0-)
 ```
+_Note that `complement` above will be correct only if both lists are of the same
+length._
 
 In order to use this approach in here, we need to prove that `cumsum` and `diffEnc`
 correspond to integration, and differentiation operators for discrete time domain.
 
 Now let's define neutral elements of both operations above:
 ```{.haskell}
-preserved :: Probability a => a -> LatencyDistribution a
+preserved :: Probability         a
+          =>                     a
+          -> LatencyDistribution a
 preserved a = LatencyDistribution {
-    pdf = Series [a]
-  }
+                pdf = Series [a]  }
 
-allLostLD, noDelayLD :: Probability a => LatencyDistribution a
+allLostLD, noDelayLD :: Probability         a
+                     => LatencyDistribution a
 allLostLD = preserved 0.0
 noDelayLD = preserved 1.0
 ```
@@ -323,11 +324,10 @@ It is also:
 4. Failover $A<t>B$ when action is attempted for a fixed period of time $t$,
    and if it does not complete in this time, the other action is attempted:
 ```{.haskell .literate}
-failover deadline rdTry rdCatch = fromPDF
-                                $ initial <> fmap (remainder*) (pdf rdCatch)
+failover deadline rdTry rdCatch = fromPDF $
+    initial <> fmap (remainder*) (pdf rdCatch)
   where
     initial = cut deadline $ pdf rdTry
-    -- | Remainder of distribution for all initial values
     remainder = 1 - sum initial
 ```
 
@@ -378,9 +378,8 @@ class TimeToCompletion ttc where
   allLost       :: ttc
   noDelay       :: ttc
   noDelay        = delay 0
-  {-# MINIMAL firstToFinish, lastToFinish, after, delay, allLost #-}
-  -- | Add explicit case/if to make correct estimate
-  --   single pass instead of trace
+  {-# MINIMAL firstToFinish, lastToFinish,
+              after, delay, allLost #-}
 
 infixr 7 `after`
 infixr 5 `firstToFinish`
@@ -413,12 +412,16 @@ of multiplication (unit or one), and `bottom` is neutral element of addition.
 Note that both of these binary operators give also rise to two
 almost-scalar multiplication operators:
 ```{.haskell .literate}
-scaleProbability :: Probability a
-                 => a -> LatencyDistribution a -> LatencyDistribution a
+scaleProbability :: Probability         a
+                 =>                     a
+                 -> LatencyDistribution a
+                 -> LatencyDistribution a
 scaleProbability a = after $ preserved a
 
-scaleDelay  :: Probability a
-            => Delay -> LatencyDistribution a -> LatencyDistribution a
+scaleDelay  :: Probability         a
+            => Delay
+            -> LatencyDistribution a
+            -> LatencyDistribution a
 scaleDelay t = after $ delayLD t
 
 delayLD :: Probability a
@@ -448,28 +451,40 @@ instance Show                      a
 
 To convert possibly improper `LatencyDistribution` into its canonical representation:
 ```{.haskell .literate}
-canonicalizeLD :: Probability a
-               => LatencyDistribution a -> LatencyDistribution a
-canonicalizeLD = LatencyDistribution     . Series
-               . assureAtLeastOneElement . dropTrailingZeros . cutWhenSumOverOne 0.0
-               . unSeries                . pdf
+canonicalizeLD :: Probability         a
+               => LatencyDistribution a
+               -> LatencyDistribution a
+canonicalizeLD = LatencyDistribution
+               . Series
+               . assureAtLeastOneElement
+               . dropTrailingZeros
+               . cutWhenSumOverOne 0.0
+               . unSeries
+               . pdf
   where
-    cutWhenSumOverOne aSum []                  = []
-    cutWhenSumOverOne aSum (x:xs) | aSum+x>1.0 = [1.0-aSum]
-    cutWhenSumOverOne aSum (x:xs)              = x:cutWhenSumOverOne (aSum+x) xs
-    assureAtLeastOneElement []                 = [0.0]
-    assureAtLeastOneElement other              = other
-    -- NOTE: this should be dropped when approximating by infinite series
-    dropTrailingZeros                          = reverse . dropWhile (==0.0) . reverse
+    cutWhenSumOverOne aSum []           = []
+    cutWhenSumOverOne aSum (x:xs)
+                           | aSum+x>1.0 = [1.0-aSum]
+    cutWhenSumOverOne aSum (x:xs)       =
+        x:cutWhenSumOverOne (aSum+x) xs
+    assureAtLeastOneElement []          = [0.0]
+    assureAtLeastOneElement other       = other
+    -- NOTE: this should be dropped
+    -- when approximating by infinite series
+    dropTrailingZeros                   = reverse
+                    . dropWhile (==0.0) . reverse
 ```
 To compare distributions represented by series of approximate values we need approximate equality:
 ```{.haskell .literate}
-instance (Metric     a
-         ,Num        a
-         ,Real       a)
-      => Metric (LatencyDistribution a) where
-  LatencyDistribution l `distance` LatencyDistribution m =
-    realToFrac $ sum $ fmap (^2) $ l-m
+instance (Metric                a
+         ,Num                   a
+         ,Real                  a)
+      => Metric
+           (LatencyDistribution a) where
+  LatencyDistribution l
+    `distance`
+      LatencyDistribution m =
+        realToFrac $ sum $ fmap (^2) $ l-m
   similarityThreshold = 1/1000
 ```
 
@@ -487,10 +502,15 @@ instance Null a
 
 ```{.haskell .hidden}
 extendToSameLengthLD :: Null a
-                     => (LatencyDistribution a, LatencyDistribution a)
-                     -> (LatencyDistribution a, LatencyDistribution a)
-extendToSameLengthLD (LatencyDistribution ld1, LatencyDistribution ld2) =
-    (LatencyDistribution ld1', LatencyDistribution ld2')
+                     => (LatencyDistribution a
+                        ,LatencyDistribution a)
+                     -> (LatencyDistribution a
+                        ,LatencyDistribution a)
+extendToSameLengthLD (LatencyDistribution ld1
+                     ,LatencyDistribution ld2) =
+    (LatencyDistribution ld1'
+    ,LatencyDistribution ld2')
   where
-    (ld1', ld2') = extendToSameLength nullE (ld1, ld2)
+    (ld1', ld2') = extendToSameLength nullE
+                                     (ld1, ld2)
 ```
