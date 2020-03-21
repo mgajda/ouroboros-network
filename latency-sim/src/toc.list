@@ -4,5 +4,4 @@ LatencyEstimates.lhs
 Simulation.lhs
 Network.lhs
 KOutOfN.lhs
-closure.mmd
-ack.mmd
+epilogue.mmd
